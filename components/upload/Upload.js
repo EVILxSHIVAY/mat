@@ -52,13 +52,7 @@ export default function Upload() {
           setRegisteredSuppliers(names);
         }
       } else {
-        setRegisteredSuppliers([
-          "Vasu Enterprises",
-          "Apex Supplies",
-          "Shree Balaji Fittings",
-          "National Tools & Hardware",
-          "Krishna Pipe Solutions"
-        ]);
+        setRegisteredSuppliers([]);
       }
     } catch (e) {
       console.warn("Could not read bills:", e);
@@ -69,7 +63,7 @@ export default function Upload() {
   // Pre-fill supplier name if logged in as supplier
   useEffect(() => {
     if (isSupplier) {
-      setSupplierName(user?.supplierName || "Vasu Enterprises");
+      setSupplierName(user?.supplierName || "");
     }
   }, [isSupplier, user]);
 
@@ -118,7 +112,7 @@ export default function Upload() {
 
     const today = new Date().toLocaleDateString("en-GB");
     const activeSupplier = isSupplier
-      ? (user?.supplierName || "Vasu Enterprises")
+      ? (user?.supplierName || "Supplier")
       : (supplierName || "Direct Vendor");
 
     const newBill = {
@@ -126,7 +120,7 @@ export default function Upload() {
       billType,
       billNumber: billNumber || `${billType === "Tax Invoice" ? "INV" : "PI"}-${Date.now().toString().slice(-4)}`,
       supplierName: activeSupplier,
-      supplierCode: isSupplier ? (user?.supplierCode || "SUP-001") : "",
+      supplierCode: isSupplier ? (user?.supplierCode || "") : "",
       billDate: billDate || today,
       amount: amount ? `₹ ${Number(amount).toLocaleString()}` : "—",
       fileName: file.name,
@@ -166,8 +160,8 @@ export default function Upload() {
 
     // If logged in as supplier, isolate strictly to their bills
     if (isSupplier) {
-      const myName = (user?.supplierName || "Vasu Enterprises").toLowerCase();
-      const myCode = (user?.supplierCode || "SUP-001").toLowerCase();
+      const myName = (user?.supplierName || "Supplier").toLowerCase();
+      const myCode = (user?.supplierCode || "").toLowerCase();
       list = list.filter(
         (b) =>
           (b.supplierName && b.supplierName.toLowerCase() === myName) ||
@@ -264,7 +258,7 @@ export default function Upload() {
             <span style={{ fontSize: "20px" }}>🏢</span>
             <div>
               <b style={{ color: "#1e40af", fontSize: "13.5px" }}>
-                Supplier Account: {user?.supplierName || "Vasu Enterprises"} ({user?.supplierCode || "SUP-001"})
+                Supplier Account: {user?.supplierName || "Supplier"} {user?.supplierCode ? `(${user.supplierCode})` : ""}
               </b>
               <p style={{ color: "#3b82f6", fontSize: "12px", margin: "2px 0 0" }}>
                 All documents submitted here will be automatically assigned to your vendor ledger and available to Admin.
@@ -369,7 +363,7 @@ export default function Upload() {
                     fontSize: "13px",
                   }}
                 >
-                  🏢 {user?.supplierName || "Vasu Enterprises"} (Locked)
+                  🏢 {user?.supplierName || "Supplier"} (Locked)
                 </div>
               ) : (
                 <input

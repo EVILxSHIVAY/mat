@@ -822,7 +822,11 @@ export default function PartyLedgerPage() {
                     type="text"
                     required
                     value={newNeeded.materialName}
-                    onChange={(e) => setNewNeeded({ ...newNeeded, materialName: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const inferred = val.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
+                      setNewNeeded({ ...newNeeded, materialName: val, unit: inferred });
+                    }}
                   />
                 </div>
 
@@ -838,12 +842,16 @@ export default function PartyLedgerPage() {
                 </div>
 
                 <div>
-                  <label>Unit</label>
-                  <input
-                    type="text"
-                    value={newNeeded.unit}
+                  <label>Unit (Pcs or Meter)</label>
+                  <select
+                    value={newNeeded.unit === "Meter" ? "Meter" : "Pcs"}
                     onChange={(e) => setNewNeeded({ ...newNeeded, unit: e.target.value })}
-                  />
+                    className="invSelect"
+                    style={{ width: "100%", height: "38px" }}
+                  >
+                    <option value="Pcs">Pcs</option>
+                    <option value="Meter">Meter</option>
+                  </select>
                 </div>
 
                 <div>

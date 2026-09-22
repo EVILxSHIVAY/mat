@@ -35,7 +35,34 @@ export async function proxy(request) {
     session = await verifySessionToken(token);
   }
 
-  // 3. If unauthenticated and accessing a protected page -> Redirect to /login
+  // 3. API Route Protection: NEVER redirect API fetch requests to HTML pages
+  if (pathname.startsWith("/api/")) {
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Session required." },
+        { status: 401 }
+      );
+    }
+    // Strict Server-Side Scope for Role APIs
+    if (pathname.startsWith("/api/supplier")) {
+      if (session.role !== "SUPPLIER" && session.role !== "ADMIN") {
+        return NextResponse.json(
+          { success: false, error: "Forbidden. Supplier role required." },
+          { status: 403 }
+        );
+      }
+    } else if (pathname.startsWith("/api/vendor")) {
+      if (session.role !== "VENDOR" && session.role !== "ADMIN") {
+        return NextResponse.json(
+          { success: false, error: "Forbidden. Vendor role required." },
+          { status: 403 }
+        );
+      }
+    }
+    return NextResponse.next();
+  }
+
+  // 4. Page Protection: If unauthenticated and accessing protected page -> Redirect to /login
   if (!session) {
     if (!isPublicRoute) {
       const loginUrl = new URL("/login", request.url);
@@ -47,15 +74,12 @@ export async function proxy(request) {
     return NextResponse.next();
   }
 
-  // 4. If authenticated and accessing login/auth pages -> Forward to appropriate dashboard
-  if (pathname === "/login" || pathname === "/forgot-password" || pathname === "/reset-password") {
-    const destination = session.role === "SUPPLIER" ? "/supplier" : "/";
-    return NextResponse.redirect(new URL(destination, request.url));
-  }
-
-  // 5. Role restrictions: Suppliers cannot access admin operations
+  // 5. Page Role Restrictions: Suppliers and Vendors cannot access unpermitted areas
   if (session.role === "SUPPLIER" && !pathname.startsWith("/supplier") && !isPublicRoute) {
     return NextResponse.redirect(new URL("/supplier", request.url));
+  }
+  if (session.role === "VENDOR" && !pathname.startsWith("/vendor") && !isPublicRoute) {
+    return NextResponse.redirect(new URL("/vendor", request.url));
   }
 
   return NextResponse.next();

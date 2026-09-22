@@ -16,8 +16,8 @@ import {
   calculateLiveInventory,
   getStorageData,
   STORAGE_KEYS,
+  purgeAllOperationalData,
 } from "@/lib/dataService";
-import { DEFAULT_SUPPLIERS } from "@/data/defaultSuppliers";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import "@/components/ui/ui.css";
 import "./reports.css";
@@ -25,7 +25,7 @@ import "./reports.css";
 export default function ReportsPage() {
   const [data, setData] = useState({
     inventory: [],
-    suppliers: DEFAULT_SUPPLIERS,
+    suppliers: [],
     purchases: [],
     issues: [],
     consumptions: [],
@@ -43,10 +43,8 @@ export default function ReportsPage() {
   const [webhookInput, setWebhookInput] = useState("");
   const [sheetUrlInput, setSheetUrlInput] = useState("");
 
-
-
   useEffect(() => {
-    const rawSuppliers = getStorageData(STORAGE_KEYS.SUPPLIERS, DEFAULT_SUPPLIERS);
+    const rawSuppliers = getStorageData(STORAGE_KEYS.SUPPLIERS, []);
 
     setData({
       inventory: calculateLiveInventory(),
@@ -122,7 +120,30 @@ export default function ReportsPage() {
     }
   };
 
-
+  const handlePurgeData = () => {
+    if (
+      confirm(
+        "Are you sure you want to delete all operational records (Suppliers, Vendors, Purchases, Issues, Consumptions, Bills, Requisitions, Payments, Returns)?\n\nInventory & Products Master will be completely PRESERVED."
+      )
+    ) {
+      purgeAllOperationalData(false);
+      setData({
+        inventory: calculateLiveInventory(),
+        suppliers: [],
+        purchases: [],
+        issues: [],
+        consumptions: [],
+        bills: [],
+        needed: [],
+        payments: [],
+        returns: [],
+      });
+      setSyncStatus({
+        type: "success",
+        message: "✓ All operational entries (suppliers, vendors, purchases, issues, bills, payments, requests) have been deleted. Inventory and Product Master remain fully preserved.",
+      });
+    }
+  };
 
   const handleSaveConfig = (e) => {
     e.preventDefault();
@@ -214,7 +235,7 @@ export default function ReportsPage() {
       category: "operations",
       categoryLabel: "Operations",
       title: "Material Issue & Dispatches",
-      desc: "Challans and materials dispatched to contractors, departments, and sites.",
+      desc: "Challans and materials dispatched to vendors, departments, and sites.",
       count: data.issues.length,
       icon: "↗",
       onExport: () =>
@@ -384,6 +405,24 @@ export default function ReportsPage() {
             >
               {syncLoading ? "Syncing..." : "⚡ Sync Master Sheet (Upsert)"}
             </button>
+            <button
+              type="button"
+              className="btn btn-danger"
+              style={{
+                background: "#ef4444",
+                color: "#ffffff",
+                border: "none",
+                fontWeight: "600",
+                fontSize: "13px",
+                padding: "8px 14px",
+                borderRadius: "6px",
+                cursor: "pointer",
+              }}
+              onClick={handlePurgeData}
+              title="Delete all operational entries (suppliers, vendors, issues, purchases, etc.) while preserving inventory & products"
+            >
+              🗑 Clear Operational Data
+            </button>
           </div>
         </div>
 
@@ -452,8 +491,6 @@ export default function ReportsPage() {
             {syncStatus.message}
           </div>
         )}
-      </section>
-
       </section>
 
 

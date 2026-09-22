@@ -69,14 +69,14 @@ export default function ConsumptionForm() {
 
     // Build rows from issue items
     const rawItems = issue.items || [
-      { name: 'GI Pipe 1/2"', quantity: 50, unit: "Mtr" },
-      { name: "Isolation Valve 1/2\"", quantity: 10, unit: "Nos" },
+      { name: 'GI Pipe 1/2"', quantity: 50, unit: "Meter" },
+      { name: "Isolation Valve 1/2\"", quantity: 10, unit: "Pcs" },
       { name: "Hose Clamp", quantity: 20, unit: "Pcs" },
     ];
 
     const rows = rawItems.map((item) => {
       const name = item.name || item.materialName;
-      const unit = item.unit || "Pcs";
+      const unit = (item.unit === "Meter" || String(name).toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
       const issuedQty = Number(item.quantity || item.qty) || 0;
       const prevUsed = priorUsageMap[name.toLowerCase()] || 0;
       const balance = Math.max(0, issuedQty - prevUsed);

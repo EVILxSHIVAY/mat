@@ -404,10 +404,11 @@ export default function ReturnsPage() {
                   value={newReturn.materialName}
                   onChange={(val) => {
                     const found = materialCatalog.find((m) => m.name === val);
+                    const inferred = (found?.unit === "Meter" || val.toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
                     setNewReturn({
                       ...newReturn,
                       materialName: val,
-                      unit: found ? found.unit : "Pcs",
+                      unit: inferred,
                     });
                   }}
                   placeholder="Select material..."
@@ -428,14 +429,17 @@ export default function ReturnsPage() {
                   </label>
 
                   <label>
-                    Unit
-                    <input
-                      type="text"
-                      value={newReturn.unit}
+                    Unit (Pcs or Meter)
+                    <select
+                      value={newReturn.unit === "Meter" ? "Meter" : "Pcs"}
                       onChange={(e) =>
                         setNewReturn({ ...newReturn, unit: e.target.value })
                       }
-                    />
+                      style={{ height: "40px" }}
+                    >
+                      <option value="Pcs">Pcs</option>
+                      <option value="Meter">Meter</option>
+                    </select>
                   </label>
                 </div>
 

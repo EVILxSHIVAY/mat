@@ -69,31 +69,54 @@ export default function NewPurchasePage() {
   useEffect(() => {
     setMaterialCatalog(getMasterMaterialCatalog());
     const storedSuppliers = getStorageData(STORAGE_KEYS.SUPPLIERS, []);
-    const supNames = [
-      "Vasu Enterprises",
-      "ESSEMM Incorporation",
-      "HP Steel Industries",
-      "Nutan Trading Co.",
-      "Chokhawala Distributors",
-      "Alfa Hoses",
-      "Sharansh Enterprises",
-    ];
+    const supList = [];
     storedSuppliers.forEach((s) => {
-      const name = Array.isArray(s) ? s[1] : s.name;
-      if (name && !supNames.includes(name)) supNames.push(name);
+      const code = Array.isArray(s) ? s[0] : s?.code;
+      const name = Array.isArray(s) ? s[1] : s?.name;
+      if (name && !supList.some((item) => item.name === name)) {
+        supList.push({ name, code: code || "" });
+      }
     });
-    setSuppliersList(supNames);
-    if (!details.supplier && supNames.length > 0) {
-      setDetails((prev) => ({ ...prev, supplier: supNames[0] }));
+    setSuppliersList(supList);
+    if (!details.supplier && supList.length > 0) {
+      setDetails((prev) => ({ ...prev, supplier: supList[0].name, supplierCode: supList[0].code }));
+    }
+
+    // Prefill from URL query params (e.g. from Material Requests or shortcut)
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const reqMat = urlParams.get("material");
+      const reqQty = Number(urlParams.get("qty")) || 50;
+      const rawUnit = urlParams.get("unit");
+      const reqUnit = (rawUnit === "Meter" || rawUnit === "Pcs")
+        ? rawUnit
+        : (reqMat?.toLowerCase().includes("pipe") ? "Meter" : "Pcs");
+      const reqLoc = urlParams.get("location");
+      if (reqLoc) {
+        setDetails((prev) => ({ ...prev, location: reqLoc }));
+      }
+      if (reqMat) {
+        setLineItems([
+          {
+            materialName: reqMat,
+            unit: reqUnit,
+            quantity: reqQty,
+            rate: 150,
+            gstPercent: 18,
+            total: Math.round(reqQty * 150 * 1.18),
+          },
+        ]);
+      }
     }
   }, []);
 
   // Material Line Item Helpers
   const handleAddLineItem = () => {
-    const defaultMat = materialCatalog[0] || { name: "GI Pipe 1/2\"", unit: "Mtr", defaultRate: 150 };
+    const defaultMat = materialCatalog[0] || { name: "GI Pipe 1/2\"", unit: "Meter", defaultRate: 150 };
+    const inferredUnit = defaultMat.unit === "Meter" || defaultMat.name.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
     const newItem = {
       materialName: defaultMat.name,
-      unit: defaultMat.unit,
+      unit: inferredUnit,
       quantity: 10,
       rate: defaultMat.defaultRate || 100,
       gstPercent: 18,
@@ -109,8 +132,10 @@ export default function NewPurchasePage() {
     if (field === "materialName") {
       const found = materialCatalog.find((m) => m.name === value);
       if (found) {
-        copy[index].unit = found.unit;
+        copy[index].unit = found.unit === "Meter" || found.name.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
         copy[index].rate = found.defaultRate || copy[index].rate;
+      } else {
+        copy[index].unit = value.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
       }
     }
 
@@ -168,19 +193,24 @@ export default function NewPurchasePage() {
 
     setIsSubmitting(true);
 
-    // 1. Create Purchase Master Record
+    // 1. Create Purchase Master Record placed by Admin
     const newPurchase = {
       piNumber: details.piNumber,
       piDate: details.piDate,
       supplier: details.supplier,
+      supplierCode: details.supplierCode || "",
       quotationNumber: details.quotationNumber,
       itemsCount: lineItems.length,
       totalAmount: `₹ ${grandTotal.toLocaleString()}`,
-      status: payment.paymentStatus === "Paid" ? "Paid" : payment.paymentStatus === "Partial" ? "Partial" : "Approved",
+      orderStatus: "Pending Supplier Approval",
+      status: "Pending Supplier Approval",
       deliveryStatus: "Pending",
       location: details.location,
+      destinationSite: details.location,
       remarks: details.remarks,
       lineItems: lineItems,
+      placedBy: "Admin",
+      createdAt: new Date().toISOString(),
       payment: {
         ...payment,
         totalBilled: grandTotal,
@@ -238,7 +268,7 @@ export default function NewPurchasePage() {
       setStorageData(STORAGE_KEYS.BILLS, [newBill, ...currentBills]);
     }
 
-    setMessage(`✓ Purchase ${details.piNumber} created successfully and inventory updated! Redirecting...`);
+    setMessage(`✓ Product request [${details.piNumber}] sent to ${details.supplier}! Supplier has received it in their portal and will approve/fulfill delivery to ${details.location}. Redirecting...`);
     setTimeout(() => {
       router.push("/purchases");
     }, 1200);
@@ -253,8 +283,8 @@ export default function NewPurchasePage() {
   return (
     <Shell>
       <Title
-        title="Create Purchase / PI"
-        desc="5-step dynamic procurement order with line-item calculations and automatic inventory tracking."
+        title="Request Products from Supplier / Purchase Order"
+        desc="Place product supply requests to registered suppliers. The supplier receives this request in their portal, approves it, and fulfills delivery to our project site."
       />
 
       {/* Stepper Header */}
@@ -273,81 +303,131 @@ export default function NewPurchasePage() {
         <section className="card formCard animate-fade-in">
           <div className="sectionHead">
             <div>
-              <h2>Step 1: Purchase Header & Supplier</h2>
-              <p>Specify the supplier, purchase order number, and delivery location.</p>
+              <h2>Step 1: Purchase Order & Supplier Assignment</h2>
+              <p>Select the registered supplier, purchase order number, and delivery destination site.</p>
             </div>
           </div>
 
-          <div className="formGrid">
-            <SearchableSelect
-              label="Supplier"
-              required
-              options={suppliersList}
-              value={details.supplier}
-              onChange={(val) => setDetails({ ...details, supplier: val })}
-              placeholder="Select supplier..."
-            />
-
-            <label>
-              Purchase / PI Number *
-              <input
-                type="text"
-                required
-                value={details.piNumber}
-                onChange={(e) => setDetails({ ...details, piNumber: e.target.value })}
-              />
-            </label>
-
-            <label>
-              Purchase Date *
-              <input
-                type="date"
-                required
-                value={details.piDate}
-                onChange={(e) => setDetails({ ...details, piDate: e.target.value })}
-              />
-            </label>
-
-            <label>
-              Destination Location *
-              <select
-                value={details.location}
-                onChange={(e) => setDetails({ ...details, location: e.target.value })}
+          {suppliersList.length === 0 ? (
+            <div
+              style={{
+                padding: "18px 20px",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "8px",
+                color: "#991b1b",
+                marginBottom: "20px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "12px",
+              }}
+            >
+              <div>
+                <strong style={{ display: "block", fontSize: "14px", marginBottom: "4px" }}>
+                  ⚠️ No Registered Suppliers in Directory
+                </strong>
+                <span style={{ fontSize: "13px" }}>
+                  Orders can only be placed to suppliers registered in the Admin Suppliers Directory. Please add a supplier first.
+                </span>
+              </div>
+              <a
+                href="/suppliers"
+                className="btn btn-primary"
+                style={{ textDecoration: "none", fontSize: "13px", padding: "8px 14px", whiteSpace: "nowrap" }}
               >
-                <option value="Central Warehouse">Central Warehouse</option>
-                <option value="Jaipur Site">Jaipur Site</option>
-                <option value="Vrindavan Site A">Vrindavan Site A</option>
-                <option value="Kosi Kalan Store">Kosi Kalan Store</option>
-              </select>
-            </label>
-
-            <label>
-              Quotation Reference Number
-              <input
-                type="text"
-                value={details.quotationNumber}
-                onChange={(e) => setDetails({ ...details, quotationNumber: e.target.value })}
+                + Add Supplier in Directory ➔
+              </a>
+            </div>
+          ) : (
+            <div className="formGrid">
+              <SearchableSelect
+                label="Supplier (from Admin Directory) *"
+                required
+                options={suppliersList.map((s) => `${s.name}${s.code ? ` (${s.code})` : ""}`)}
+                value={
+                  details.supplier
+                    ? `${details.supplier}${details.supplierCode ? ` (${details.supplierCode})` : ""}`
+                    : ""
+                }
+                onChange={(val) => {
+                  const match = suppliersList.find(
+                    (s) => `${s.name}${s.code ? ` (${s.code})` : ""}` === val || s.name === val
+                  );
+                  setDetails({
+                    ...details,
+                    supplier: match ? match.name : val,
+                    supplierCode: match ? match.code : "",
+                  });
+                }}
+                placeholder="Choose registered supplier..."
               />
-            </label>
 
-            <label>
-              Remarks / Notes
-              <input
-                type="text"
-                placeholder="Optional delivery terms or references"
-                value={details.remarks}
-                onChange={(e) => setDetails({ ...details, remarks: e.target.value })}
-              />
-            </label>
-          </div>
+              <label>
+                Purchase / PO Number *
+                <input
+                  type="text"
+                  required
+                  value={details.piNumber}
+                  onChange={(e) => setDetails({ ...details, piNumber: e.target.value })}
+                />
+              </label>
+
+              <label>
+                Order Date *
+                <input
+                  type="date"
+                  required
+                  value={details.piDate}
+                  onChange={(e) => setDetails({ ...details, piDate: e.target.value })}
+                />
+              </label>
+
+              <label>
+                Delivery Destination Site *
+                <select
+                  value={details.location}
+                  onChange={(e) => setDetails({ ...details, location: e.target.value })}
+                >
+                  <option value="Central Warehouse">Central Warehouse (Main)</option>
+                  <option value="Jaipur Project Site">Jaipur Project Site</option>
+                  <option value="Ajmer City Gas Site">Ajmer City Gas Site</option>
+                  <option value="Vrindavan Site A">Vrindavan Site A</option>
+                  <option value="Delhi Store & Hub">Delhi Store & Hub</option>
+                  <option value="Kosi Kalan Store">Kosi Kalan Store</option>
+                </select>
+              </label>
+
+              <label>
+                Quotation Reference Number
+                <input
+                  type="text"
+                  value={details.quotationNumber}
+                  onChange={(e) => setDetails({ ...details, quotationNumber: e.target.value })}
+                />
+              </label>
+
+              <label>
+                Remarks / Delivery Instructions
+                <input
+                  type="text"
+                  placeholder="e.g. Deliver before Friday, unload at Gate 2"
+                  value={details.remarks}
+                  onChange={(e) => setDetails({ ...details, remarks: e.target.value })}
+                />
+              </label>
+            </div>
+          )}
 
           <div className="stepFooter">
             <button
               type="button"
               className="primary"
+              disabled={suppliersList.length === 0 || !details.supplier}
               onClick={() => {
                 if (!details.supplier) {
-                  alert("Please choose a supplier.");
+                  alert("Please choose a supplier from the directory.");
                   return;
                 }
                 setCurrentStep(2);
@@ -522,12 +602,14 @@ export default function NewPurchasePage() {
                       />
                     </td>
                     <td>
-                      <input
-                        type="text"
-                        style={{ height: "38px" }}
-                        value={item.unit}
+                      <select
+                        style={{ height: "38px", width: "100%", padding: "4px 8px", borderRadius: "6px", border: "1px solid var(--border-default)", background: "var(--surface-card, #fff)", fontWeight: 600 }}
+                        value={item.unit === "Meter" ? "Meter" : "Pcs"}
                         onChange={(e) => handleUpdateLineItem(idx, "unit", e.target.value)}
-                      />
+                      >
+                        <option value="Pcs">Pcs</option>
+                        <option value="Meter">Meter</option>
+                      </select>
                     </td>
                     <td>
                       <input
@@ -881,11 +963,11 @@ export default function NewPurchasePage() {
             <button
               type="button"
               className="primary"
-              style={{ minWidth: "160px" }}
+              style={{ minWidth: "180px" }}
               disabled={isSubmitting}
               onClick={handleConfirmPurchase}
             >
-              {isSubmitting ? "Confirming..." : "✓ Confirm Purchase Order"}
+              {isSubmitting ? "Sending Request..." : "🚀 Send Product Request to Supplier"}
             </button>
           </div>
         </section>

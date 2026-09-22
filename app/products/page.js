@@ -14,6 +14,7 @@ import {
   STORAGE_KEYS,
 } from "@/lib/dataService";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
+import StockAdjustModal from "@/components/inventory/StockAdjustModal";
 import "@/components/ui/ui.css";
 
 const CATEGORIES = [
@@ -31,6 +32,10 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  // Stock Adjustment Modal
+  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [adjustingProduct, setAdjustingProduct] = useState(null);
 
   // Add / Edit Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -83,12 +88,14 @@ export default function ProductsPage() {
       return;
     }
 
+    const validatedUnit = formData.unit === "Meter" ? "Meter" : (formData.name.toLowerCase().includes("pipe") ? "Meter" : "Pcs");
+
     const row = [
       formData.code,
       formData.name,
       "",
       formData.category,
-      formData.unit,
+      validatedUnit,
       formData.supplier,
       formData.rate,
       "18%",
@@ -155,6 +162,17 @@ export default function ProductsPage() {
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", width: "100%" }}>
             <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={handleExport}>
               ⤓ Export
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ flex: 1, whiteSpace: "nowrap" }}
+              onClick={() => {
+                setAdjustingProduct(null);
+                setIsAdjustModalOpen(true);
+              }}
+            >
+              + Add Quantity
             </button>
             <button type="button" className="btn-primary" style={{ flex: 1 }} onClick={handleOpenAdd}>
               + Add Product
@@ -248,16 +266,29 @@ export default function ProductsPage() {
                   <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                     📍 {p.location}
                   </span>
-                  <button
-                    type="button"
-                    className="actionBtn view"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedProduct(p);
-                    }}
-                  >
-                    Inspect Specs →
-                  </button>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button
+                      type="button"
+                      className="actionBtn edit"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAdjustingProduct(p);
+                        setIsAdjustModalOpen(true);
+                      }}
+                    >
+                      + Add Qty
+                    </button>
+                    <button
+                      type="button"
+                      className="actionBtn view"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProduct(p);
+                      }}
+                    >
+                      Inspect Specs →
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -303,16 +334,30 @@ export default function ProductsPage() {
                       <Badge>{p.status}</Badge>
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="actionBtn view"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedProduct(p);
-                        }}
-                      >
-                        Inspect →
-                      </button>
+                      <div className="actionBtnGroup">
+                        <button
+                          type="button"
+                          className="actionBtn edit"
+                          title="Add quantity or edit price"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAdjustingProduct(p);
+                            setIsAdjustModalOpen(true);
+                          }}
+                        >
+                          + Add Qty / Price
+                        </button>
+                        <button
+                          type="button"
+                          className="actionBtn view"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedProduct(p);
+                          }}
+                        >
+                          Inspect →
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -406,7 +451,21 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <h4 className="drawerSectionTitle">Material Specifications & Rates</h4>
+            <div style={{ marginTop: "12px" }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                onClick={() => {
+                  setAdjustingProduct(selectedProduct);
+                  setIsAdjustModalOpen(true);
+                }}
+              >
+                <span>➕</span> Add Quantity & Edit Price
+              </button>
+            </div>
+
+            <h4 className="drawerSectionTitle" style={{ marginTop: "16px" }}>Material Specifications & Rates</h4>
             <div className="drawerKvList">
               <div className="drawerKvRow">
                 <span className="drawerKvLabel">Material Description:</span>
@@ -507,7 +566,15 @@ export default function ProductsPage() {
                     type="text"
                     required
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      const inferred = newName.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
+                      setFormData({
+                        ...formData,
+                        name: newName,
+                        unit: inferred,
+                      });
+                    }}
                   />
                 </label>
 
@@ -528,13 +595,16 @@ export default function ProductsPage() {
                 </label>
 
                 <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-                  Unit of Measure *
-                  <input
-                    type="text"
-                    required
-                    value={formData.unit}
+                  Unit of Measure (Pcs or Meter) *
+                  <select
+                    value={formData.unit === "Meter" ? "Meter" : "Pcs"}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  />
+                    className="invSelect"
+                    style={{ width: "100%" }}
+                  >
+                    <option value="Pcs">Pcs</option>
+                    <option value="Meter">Meter</option>
+                  </select>
                 </label>
 
                 <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
@@ -587,6 +657,24 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+
+      {/* Stock Adjustment Modal */}
+      <StockAdjustModal
+        isOpen={isAdjustModalOpen}
+        onClose={() => setIsAdjustModalOpen(false)}
+        products={productsList}
+        initialProduct={adjustingProduct}
+        onStockUpdated={() => {
+          const fresh = calculateLiveInventory();
+          setProductsList(fresh);
+          if (selectedProduct) {
+            const updated = fresh.find(
+              (p) => p.code === selectedProduct.code || p.name === selectedProduct.name
+            );
+            if (updated) setSelectedProduct(updated);
+          }
+        }}
+      />
     </Shell>
   );
 }

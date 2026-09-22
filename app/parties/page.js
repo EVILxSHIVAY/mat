@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
@@ -18,6 +18,7 @@ export default function PartiesAndSitesPage() {
   const [needed, setNeeded] = useState([]);
   const [payments, setPayments] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [vendors, setVendors] = useState([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -26,47 +27,18 @@ export default function PartiesAndSitesPage() {
     setNeeded(getStorageData(STORAGE_KEYS.NEEDED, []));
     setPayments(getStorageData(STORAGE_KEYS.PAYMENTS, []));
     setSuppliers(getStorageData(STORAGE_KEYS.SUPPLIERS, []));
+    setVendors(getStorageData(STORAGE_KEYS.VENDORS, []));
   }, []);
 
-  // Map known parties and sites
-  const partySiteMap = [
-    {
-      partyName: "Apex Contractor & Infrastructure",
-      contactPerson: "Ramesh Sharma",
-      phone: "9876501234",
-      sites: [
-        { name: "Jaipur Pipeline Site", location: "Jaipur, Rajasthan", status: "Active" },
-        { name: "Ajmer City Gas Site", location: "Ajmer, Rajasthan", status: "Active" },
-      ],
-    },
-    {
-      partyName: "ABC Engineering & Construction",
-      contactPerson: "Vikas Aggarwal",
-      phone: "9812304567",
-      sites: [
-        { name: "Delhi Store & Hub", location: "Okhla, New Delhi", status: "Active" },
-        { name: "Vrindavan Site A", location: "Vrindavan, UP", status: "Active" },
-      ],
-    },
-    {
-      partyName: "GGL Vrindavan Gas Network",
-      contactPerson: "Deepak Meena",
-      phone: "9823405678",
-      sites: [
-        { name: "Kosi Kalan Store", location: "Kosi Kalan, UP", status: "Active" },
-        { name: "Goverdhan Sector 2", location: "Goverdhan, UP", status: "Active" },
-      ],
-    },
-    {
-      partyName: "PDV In-House Projects",
-      contactPerson: "Shyam Aggarwal",
-      phone: "9834506789",
-      sites: [
-        { name: "Central Warehouse", location: "Main Headquarters", status: "Active" },
-        { name: "Ganganagar Field Site", location: "Sri Ganganagar", status: "Active" },
-      ],
-    },
-  ];
+  // Map parties and sites dynamically from registered vendors
+  const partySiteMap = useMemo(() => {
+    return (vendors || []).map((v) => ({
+      partyName: v.name || "",
+      contactPerson: v.contactPerson || "",
+      phone: v.mobile || "",
+      sites: Array.isArray(v.sites) ? v.sites : [],
+    }));
+  }, [vendors]);
 
   const filteredParties = partySiteMap.filter((p) => {
     return (
@@ -80,9 +52,12 @@ export default function PartiesAndSitesPage() {
     <Shell>
       <Title
         title="Parties & Field Sites Architecture"
-        desc="Hierarchical view of contractors, clients, and their active project sites and material positions."
+        desc="Hierarchical view of vendors, clients, and their active project sites and material positions."
         action={
           <div style={{ display: "flex", gap: "8px" }}>
+            <Link href="/vendors" className="btn btn-secondary">
+              👤 Vendors Registry →
+            </Link>
             <Link href="/party-ledger" className="primary">
               ⚖ Open Party Ledger
             </Link>
@@ -105,6 +80,18 @@ export default function PartiesAndSitesPage() {
 
       {/* Parties & Sites Cards Grid */}
       <div className="partiesGrid">
+        {filteredParties.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-muted)", gridColumn: "1 / -1" }}>
+            <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>🏢</div>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: "600", marginBottom: "6px" }}>No Parties or Field Sites Found</h3>
+            <p style={{ fontSize: "0.88rem", maxWidth: "420px", margin: "0 auto 16px" }}>
+              There are currently no active vendors or project sites registered in the system.
+            </p>
+            <Link href="/vendors" className="btn btn-primary" style={{ display: "inline-flex" }}>
+              👷 Manage Vendors Registry
+            </Link>
+          </div>
+        ) : null}
         {filteredParties.map((party, idx) => {
           // Calculate material movements for this party
           const partyIssues = issues.filter(

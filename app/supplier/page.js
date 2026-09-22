@@ -63,11 +63,14 @@ export default function SupplierDashboardPage() {
 
   // Calculate Metrics strictly for this supplier
   const totalOrders = purchases.length;
-  const pendingOrders = purchases.filter((p) => {
-    const stat = (p.status || (Array.isArray(p) ? p[6] : "")).toLowerCase();
-    return stat !== "completed" && stat !== "paid";
+  const pendingApprovalCount = purchases.filter((p) => {
+    const stat = (p.orderStatus || p.status || (Array.isArray(p) ? p[6] : "")).toLowerCase();
+    return !stat.includes("approved") && stat !== "completed" && stat !== "paid";
   }).length;
-  const completedOrders = totalOrders - pendingOrders;
+  const deliveredToSiteCount = purchases.filter((p) => {
+    const deliv = (p.deliveryStatus || (Array.isArray(p) ? p[7] : "")).toLowerCase();
+    return deliv === "delivered to site" || deliv === "delivered";
+  }).length;
 
   // Parse numerical total billed from this vendor
   const totalBilledValue = purchases.reduce((acc, p) => {
@@ -78,8 +81,6 @@ export default function SupplierDashboardPage() {
 
   const companyName = profile?.companyName || user?.supplierName || "Supplier Workspace";
   const supplierCode = profile?.code || user?.supplierCode || "SUP-001";
-
-
 
   return (
     <Shell>
@@ -92,69 +93,67 @@ export default function SupplierDashboardPage() {
               Code: {supplierCode} · {profile?.status || "Active"}
             </span>
           </div>
-          <p>Supplier Portal · Track orders and material dispatches.</p>
+          <p>Supplier Workspace · Review Admin Purchase Orders, Approve, and Deliver to Site.</p>
         </div>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <Link href="/supplier/orders?action=new" className="btn btn-primary" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            <span>+</span> Place Order
+          <Link href="/supplier/orders" className="btn btn-primary" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <span>📦</span> View Incoming Orders
           </Link>
         </div>
       </div>
 
-
-
-      {/* 3. Clean Metrics Grid */}
+      {/* 2. Clean Metrics Grid */}
       <div className="supplierMetricsGrid">
         <div className="supplierMetricCard">
           <div className="supplierMetricHeader">
-            <span className="supplierMetricLabel">Total Orders</span>
+            <span className="supplierMetricLabel">Orders Placed by Admin</span>
             <span className="supplierMetricIcon">📋</span>
           </div>
           <div className="supplierMetricValue">{totalOrders}</div>
-          <span className="supplierMetricSubtext">All time orders</span>
+          <span className="supplierMetricSubtext">Total assigned purchase orders</span>
         </div>
 
         <div className="supplierMetricCard">
           <div className="supplierMetricHeader">
-            <span className="supplierMetricLabel">Pending</span>
+            <span className="supplierMetricLabel">Pending Your Approval</span>
             <span className="supplierMetricIcon">⏳</span>
           </div>
           <div className="supplierMetricValue" style={{ color: "#d97706" }}>
-            {pendingOrders}
+            {pendingApprovalCount}
           </div>
-          <span className="supplierMetricSubtext">To dispatch / deliver</span>
+          <span className="supplierMetricSubtext">Awaiting supplier confirmation</span>
         </div>
 
         <div className="supplierMetricCard">
           <div className="supplierMetricHeader">
-            <span className="supplierMetricLabel">Completed</span>
+            <span className="supplierMetricLabel">Delivered to Site</span>
             <span className="supplierMetricIcon">✓</span>
           </div>
           <div className="supplierMetricValue" style={{ color: "#059669" }}>
-            {completedOrders}
+            {deliveredToSiteCount}
           </div>
-          <span className="supplierMetricSubtext">Delivered & verified</span>
+          <span className="supplierMetricSubtext">Delivered to project site</span>
         </div>
 
         <div className="supplierMetricCard">
           <div className="supplierMetricHeader">
-            <span className="supplierMetricLabel">Total Billed</span>
+            <span className="supplierMetricLabel">Total Value</span>
             <span className="supplierMetricIcon">₹</span>
           </div>
           <div className="supplierMetricValue" style={{ color: "#4f46e5" }}>
             ₹ {totalBilledValue.toLocaleString()}
           </div>
-          <span className="supplierMetricSubtext">Total billed value</span>
+          <span className="supplierMetricSubtext">Total order amount</span>
         </div>
       </div>
 
-      {/* 4. Recent Orders Table */}
+      {/* 3. Recent Orders Table */}
       <div className="sectionHeaderRow" style={{ marginTop: "8px", marginBottom: "14px" }}>
-        <h2 className="sectionTitle">Recent Orders</h2>
+        <h2 className="sectionTitle">Incoming Purchase Orders</h2>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <Link href="/supplier/orders" className="btn btn-sm btn-secondary" style={{ textDecoration: "none" }}>
-            View All ({totalOrders}) ➔
+            View All Orders ({totalOrders}) ➔
           </Link>
         </div>
       </div>
@@ -163,9 +162,9 @@ export default function SupplierDashboardPage() {
         {purchases.length === 0 ? (
           <div style={{ padding: "36px 20px", textAlign: "center", color: "var(--text-muted)" }}>
             <div style={{ fontSize: "28px", marginBottom: "6px" }}>📦</div>
-            <b style={{ color: "var(--text-primary)" }}>No Orders Yet</b>
+            <b style={{ color: "var(--text-primary)" }}>No Orders Assigned Yet</b>
             <p style={{ fontSize: "13px", marginTop: "2px" }}>
-              Click "+ Place Order" above to submit a new supply order.
+              Official purchase orders placed by PDV Operations Admin will appear here for your approval and site delivery.
             </p>
           </div>
         ) : (
@@ -174,24 +173,27 @@ export default function SupplierDashboardPage() {
               <tr>
                 <th>PO #</th>
                 <th>Date</th>
-                <th>Quote Ref</th>
+                <th>Destination Site</th>
                 <th>Items</th>
                 <th>Total Value</th>
-                <th>Destination</th>
-                <th>Payment</th>
-                <th>Delivery</th>
+                <th>Approval</th>
+                <th>Delivery to Site</th>
               </tr>
             </thead>
             <tbody>
               {purchases.slice(0, 5).map((p, idx) => {
                 const no = p.piNumber || (Array.isArray(p) ? p[0] : `PO-${idx + 1}`);
                 const dt = p.piDate || (Array.isArray(p) ? p[1] : "—");
-                const quote = p.quotationNumber || (Array.isArray(p) ? p[3] : "—");
+                const loc = p.destinationSite || p.location || "Central Warehouse";
                 const itemsCount = p.itemsCount || (p.lineItems ? p.lineItems.length : 1);
                 const amt = p.totalAmount || (Array.isArray(p) ? p[5] : "—");
-                const loc = p.location || "Central Warehouse";
-                const stat = p.status || (Array.isArray(p) ? p[6] : "Approved");
+                const stat = p.orderStatus || p.status || (Array.isArray(p) ? p[6] : "Pending");
                 const deliv = p.deliveryStatus || (Array.isArray(p) ? p[7] : "Pending") || "Pending";
+
+                const isApproved =
+                  String(stat).toLowerCase().includes("approved") ||
+                  String(stat).toLowerCase() === "paid" ||
+                  String(stat).toLowerCase() === "completed";
 
                 return (
                   <tr key={no || idx}>
@@ -199,22 +201,23 @@ export default function SupplierDashboardPage() {
                       <b style={{ color: "var(--brand-600)" }}>{no}</b>
                     </td>
                     <td>{dt}</td>
-                    <td>{quote}</td>
+                    <td>
+                      <span style={{ fontWeight: "600" }}>📍 {loc}</span>
+                    </td>
                     <td>{itemsCount} {itemsCount === 1 ? "item" : "items"}</td>
                     <td>
                       <b>{amt}</b>
                     </td>
-                    <td>{loc}</td>
                     <td>
-                      <Badge
-                        status={
-                          stat.toLowerCase() === "paid" || stat.toLowerCase() === "completed"
-                            ? "Completed"
-                            : stat.toLowerCase() === "partial"
-                            ? "Pending"
-                            : "Approved"
-                        }
-                      />
+                      {isApproved ? (
+                        <span style={{ fontSize: "11.5px", fontWeight: "700", color: "#047857" }}>
+                          ✓ Approved
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "11.5px", fontWeight: "700", color: "#b45309" }}>
+                          ⏳ Pending Approval
+                        </span>
+                      )}
                     </td>
                     <td>
                       <Badge>{deliv}</Badge>

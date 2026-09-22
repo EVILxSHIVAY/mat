@@ -18,6 +18,7 @@ export default function PurchasesPage() {
   const [purchases, setPurchases] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [approvalFilter, setApprovalFilter] = useState("All");
   const [deliveryFilter, setDeliveryFilter] = useState("All");
   const [selectedPo, setSelectedPo] = useState(null);
 
@@ -65,20 +66,30 @@ export default function PurchasesPage() {
       if (p === po || pNum === targetNum) {
         if (Array.isArray(p)) {
           const copy = [...p];
-          copy[6] = "Approved";
+          copy[6] = "Approved by Supplier";
           return copy;
         }
-        return { ...p, status: "Approved" };
+        return {
+          ...p,
+          status: "Approved by Supplier",
+          orderStatus: "Approved by Supplier",
+          approvedAt: new Date().toISOString(),
+        };
       }
       return p;
     });
     savePurchases(updated);
     if (Array.isArray(po)) {
       const copy = [...po];
-      copy[6] = "Approved";
+      copy[6] = "Approved by Supplier";
       setSelectedPo(copy);
     } else {
-      setSelectedPo({ ...po, status: "Approved" });
+      setSelectedPo({
+        ...po,
+        status: "Approved by Supplier",
+        orderStatus: "Approved by Supplier",
+        approvedAt: new Date().toISOString(),
+      });
     }
   };
 
@@ -92,18 +103,32 @@ export default function PurchasesPage() {
   const filteredPurchases = purchases.filter((p) => {
     const no = p.piNumber || (Array.isArray(p) ? p[0] : "");
     const sup = p.supplier || (Array.isArray(p) ? p[2] : "");
+    const loc = p.destinationSite || p.location || "";
     const stat = p.status || (Array.isArray(p) ? p[6] : "");
+    const orderStat = p.orderStatus || stat;
     const deliv = p.deliveryStatus || (Array.isArray(p) ? p[7] : "Pending") || "Pending";
 
     const matchesSearch =
       !search ||
       String(no).toLowerCase().includes(search.toLowerCase()) ||
-      String(sup).toLowerCase().includes(search.toLowerCase());
+      String(sup).toLowerCase().includes(search.toLowerCase()) ||
+      String(loc).toLowerCase().includes(search.toLowerCase());
 
     const matchesStatus = statusFilter === "All" || String(stat).toLowerCase() === statusFilter.toLowerCase();
+
+    const isSupApproved =
+      String(orderStat).toLowerCase().includes("approved") ||
+      String(stat).toLowerCase() === "paid" ||
+      String(stat).toLowerCase() === "completed";
+
+    const matchesApproval =
+      approvalFilter === "All" ||
+      (approvalFilter === "Approved" && isSupApproved) ||
+      (approvalFilter === "Pending" && !isSupApproved);
+
     const matchesDelivery = deliveryFilter === "All" || String(deliv).toLowerCase() === deliveryFilter.toLowerCase();
 
-    return matchesSearch && matchesStatus && matchesDelivery;
+    return matchesSearch && matchesStatus && matchesApproval && matchesDelivery;
   });
 
   const handleExport = () => {
@@ -111,10 +136,11 @@ export default function PurchasesPage() {
       "PI Number",
       "Date",
       "Supplier",
+      "Destination Site",
       "Quote #",
       "Items Count",
       "Total Amount",
-      "Settlement Status",
+      "Supplier Approval",
       "Delivery Status",
     ];
     const rows = filteredPurchases.map((p) => {
@@ -123,6 +149,7 @@ export default function PurchasesPage() {
           p[0],
           p[1],
           p[2],
+          "Central Warehouse",
           p[3],
           p[4],
           p[5],
@@ -134,10 +161,11 @@ export default function PurchasesPage() {
         p.piNumber,
         p.piDate,
         p.supplier,
+        p.destinationSite || p.location || "Central Warehouse",
         p.quotationNumber,
         p.itemsCount,
         p.totalAmount,
-        p.status,
+        p.orderStatus || p.status,
         p.deliveryStatus || "Pending",
       ];
     });
@@ -148,14 +176,14 @@ export default function PurchasesPage() {
     <Shell>
       <Title
         title="Purchases / PI Master"
-        desc="Track inward purchase orders, supplier bills, line items, and payment settlements."
+        desc="Orders placed to registered suppliers, supplier approvals, and site delivery tracking."
         action={
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <button type="button" className="secondary" onClick={handleExport}>
               ⤓ Export to Excel
             </button>
             <Link href="/purchases/new" className="primary">
-              + New Purchase
+              + New Purchase Order
             </Link>
           </div>
         }
@@ -169,22 +197,20 @@ export default function PurchasesPage() {
               <span>🔍</span>
               <input
                 type="text"
-                placeholder="Search PI#, supplier..."
+                placeholder="Search PI#, supplier, site..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
 
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              value={approvalFilter}
+              onChange={(e) => setApprovalFilter(e.target.value)}
               className="invSelect"
             >
-              <option value="All">All Settlements</option>
-              <option value="Paid">Paid</option>
-              <option value="Partial">Partial</option>
-              <option value="Approved">Approved</option>
-              <option value="Pending">Pending</option>
+              <option value="All">All Approvals</option>
+              <option value="Approved">Approved by Supplier</option>
+              <option value="Pending">Pending Supplier Approval</option>
             </select>
 
             <select
@@ -194,8 +220,9 @@ export default function PurchasesPage() {
             >
               <option value="All">All Deliveries</option>
               <option value="Pending">Delivery: Pending</option>
-              <option value="Shipped">Delivery: Shipped</option>
-              <option value="Delivered">Delivery: Delivered</option>
+              <option value="Approved & Preparing">Delivery: Preparing</option>
+              <option value="In Transit">Delivery: In Transit</option>
+              <option value="Delivered to Site">Delivery: Delivered to Site</option>
             </select>
           </div>
 
@@ -222,11 +249,16 @@ export default function PurchasesPage() {
               const no = p.piNumber || (Array.isArray(p) ? p[0] : `PO-${idx + 1}`);
               const date = p.piDate || (Array.isArray(p) ? p[1] : "—");
               const sup = p.supplier || (Array.isArray(p) ? p[2] : "Direct Supplier");
-              const quote = p.quotationNumber || (Array.isArray(p) ? p[3] : "—");
+              const loc = p.destinationSite || p.location || "Central Warehouse";
               const count = p.itemsCount || (Array.isArray(p) ? p[4] : (p.lineItems ? p.lineItems.length : 1));
               const amt = p.totalAmount || (Array.isArray(p) ? p[5] : "—");
-              const stat = p.status || (Array.isArray(p) ? p[6] : "Approved");
+              const stat = p.orderStatus || p.status || (Array.isArray(p) ? p[6] : "Pending");
               const deliv = p.deliveryStatus || (Array.isArray(p) ? p[7] : "Pending") || "Pending";
+
+              const isSupApproved =
+                String(stat).toLowerCase().includes("approved") ||
+                String(stat).toLowerCase() === "paid" ||
+                String(stat).toLowerCase() === "completed";
 
               return (
                 <div
@@ -238,23 +270,30 @@ export default function PurchasesPage() {
                     <div className="mobileCardTitleArea">
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
                         <code className="codeBadge">{no}</code>
-                        {p.origin === "Supplier Portal" && (
-                          <span style={{ fontSize: "10px", background: "#fef3c7", color: "#92400e", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" }}>
-                            Supplier Portal
-                          </span>
-                        )}
                       </div>
                       <h3 className="mobileCardTitle">{sup}</h3>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-end" }}>
-                      <Badge>{stat}</Badge>
+                      {isSupApproved ? (
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: "#047857", background: "#ecfdf5", padding: "2px 6px", borderRadius: "4px" }}>
+                          ✓ Approved
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: "#b45309", background: "#fffbeb", padding: "2px 6px", borderRadius: "4px" }}>
+                          ⏳ Pending Approval
+                        </span>
+                      )}
                       <Badge>{deliv}</Badge>
                     </div>
                   </div>
 
                   <div className="mobileCardBody">
                     <div className="mobileMetricItem">
-                      <span className="mobileMetricLabel">Total Billed</span>
+                      <span className="mobileMetricLabel">Destination Site</span>
+                      <strong className="mobileMetricVal">📍 {loc}</strong>
+                    </div>
+                    <div className="mobileMetricItem">
+                      <span className="mobileMetricLabel">Total Value</span>
                       <strong className="mobileMetricVal highlight">{amt}</strong>
                     </div>
                     <div className="mobileMetricItem">
@@ -262,20 +301,14 @@ export default function PurchasesPage() {
                       <span className="mobileMetricVal" style={{ fontSize: "13.5px" }}>{date}</span>
                     </div>
                     <div className="mobileMetricItem">
-                      <span className="mobileMetricLabel">Line Items</span>
-                      <span className="mobileMetricVal" style={{ fontSize: "13.5px" }}><b>{count}</b> materials</span>
-                    </div>
-                    <div className="mobileMetricItem">
-                      <span className="mobileMetricLabel">Delivery</span>
-                      <span className="mobileMetricVal" style={{ fontSize: "13px" }}>
-                        <Badge>{deliv}</Badge>
-                      </span>
+                      <span className="mobileMetricLabel">Materials</span>
+                      <span className="mobileMetricVal" style={{ fontSize: "13.5px" }}><b>{count}</b> items</span>
                     </div>
                   </div>
 
                   <div className="mobileCardFooter">
                     <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                      Quote: {quote}
+                      Delivery: <strong>{deliv}</strong>
                     </span>
                     <button
                       type="button"
@@ -298,14 +331,14 @@ export default function PurchasesPage() {
           <table>
             <thead>
               <tr>
-                <th>PI / Voucher #</th>
+                <th>PI / PO #</th>
                 <th>Purchase Date</th>
                 <th>Supplier</th>
-                <th>Quotation Ref</th>
+                <th>Destination Site</th>
                 <th>Line Items</th>
                 <th>Total Value (₹)</th>
-                <th>Settlement</th>
-                <th>Delivery Status</th>
+                <th>Supplier Approval</th>
+                <th>Site Delivery</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -328,25 +361,34 @@ export default function PurchasesPage() {
                   const no = p.piNumber || (Array.isArray(p) ? p[0] : `PO-${idx + 1}`);
                   const date = p.piDate || (Array.isArray(p) ? p[1] : "—");
                   const sup = p.supplier || (Array.isArray(p) ? p[2] : "Direct Vendor");
-                  const quote = p.quotationNumber || (Array.isArray(p) ? p[3] : "—");
+                  const loc = p.destinationSite || p.location || "Central Warehouse";
                   const count = p.itemsCount || (Array.isArray(p) ? p[4] : (p.lineItems ? p.lineItems.length : 1));
                   const amt = p.totalAmount || (Array.isArray(p) ? p[5] : "—");
-                  const stat = p.status || (Array.isArray(p) ? p[6] : "Approved");
+                  const stat = p.orderStatus || p.status || (Array.isArray(p) ? p[6] : "Pending");
                   const deliv = p.deliveryStatus || (Array.isArray(p) ? p[7] : "Pending") || "Pending";
+
+                  const isSupApproved =
+                    String(stat).toLowerCase().includes("approved") ||
+                    String(stat).toLowerCase() === "paid" ||
+                    String(stat).toLowerCase() === "completed";
 
                   return (
                     <tr key={idx} onClick={() => setSelectedPo(p)}>
                       <td>
                         <strong>{no}</strong>
-                        {p.origin === "Supplier Portal" && (
-                          <span style={{ fontSize: "10px", marginLeft: "6px", background: "#fef3c7", color: "#92400e", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" }}>
-                            Supplier
-                          </span>
-                        )}
                       </td>
                       <td>{date}</td>
-                      <td>{sup}</td>
-                      <td>{quote}</td>
+                      <td>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          <span style={{ fontWeight: "600" }}>{sup}</span>
+                          {p.supplierCode && (
+                            <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{p.supplierCode}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: "600" }}>📍 {loc}</span>
+                      </td>
                       <td>
                         <b>{count}</b> materials
                       </td>
@@ -354,7 +396,15 @@ export default function PurchasesPage() {
                         <strong style={{ color: "var(--brand-700)" }}>{amt}</strong>
                       </td>
                       <td>
-                        <Badge>{stat}</Badge>
+                        {isSupApproved ? (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11.5px", fontWeight: "700", color: "#047857", background: "#ecfdf5", padding: "3px 8px", borderRadius: "5px", border: "1px solid #a7f3d0" }}>
+                            ✓ Approved
+                          </span>
+                        ) : (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11.5px", fontWeight: "700", color: "#b45309", background: "#fffbeb", padding: "3px 8px", borderRadius: "5px", border: "1px solid #fde68a" }}>
+                            ⏳ Pending Approval
+                          </span>
+                        )}
                       </td>
                       <td>
                         <Badge>{deliv}</Badge>
@@ -424,16 +474,41 @@ export default function PurchasesPage() {
             (Array.isArray(selectedPo) ? selectedPo[7] : "Pending") ||
             "Pending";
 
+          const stat = selectedPo.orderStatus || selectedPo.status || (Array.isArray(selectedPo) ? selectedPo[6] : "Pending");
+          const isSupApproved =
+            String(stat).toLowerCase().includes("approved") ||
+            String(stat).toLowerCase() === "paid" ||
+            String(stat).toLowerCase() === "completed";
+
+          const destSite = selectedPo.destinationSite || selectedPo.location || "Central Warehouse";
+          const supName = selectedPo.supplier || (Array.isArray(selectedPo) ? selectedPo[2] : "Supplier");
+
           return (
             <div>
-              {selectedPo.origin === "Supplier Portal" && (
-                <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "10px 14px", borderRadius: "8px", marginBottom: "16px" }}>
-                  <b style={{ color: "#065f46", fontSize: "12.5px" }}>📦 Supplier Initiated Order</b>
-                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#047857" }}>
-                    Submitted directly by {selectedPo.supplier || (Array.isArray(selectedPo) ? selectedPo[2] : "")} through the Supplier Portal.
-                  </p>
+              {/* Supplier Approval Banner */}
+              <div
+                style={{
+                  background: isSupApproved ? "#f0fdf4" : "#fffbeb",
+                  border: isSupApproved ? "1px solid #bbf7d0" : "1px solid #fde68a",
+                  padding: "12px 16px",
+                  borderRadius: "8px",
+                  marginBottom: "16px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "16px" }}>{isSupApproved ? "✓" : "⏳"}</span>
+                  <div>
+                    <b style={{ color: isSupApproved ? "#166534" : "#92400e", fontSize: "13px" }}>
+                      {isSupApproved ? "Order Approved by Supplier" : "Pending Supplier Approval"}
+                    </b>
+                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: isSupApproved ? "#15803d" : "#78350f" }}>
+                      {isSupApproved
+                        ? `${supName} confirmed acceptance of this order for site delivery to ${destSite}.`
+                        : `Order placed to ${supName}. Waiting for supplier to accept and prepare materials.`}
+                    </p>
+                  </div>
                 </div>
-              )}
+              </div>
 
               {/* Fulfillment & Delivery Stepper Control */}
               <div
@@ -465,11 +540,11 @@ export default function PurchasesPage() {
                         letterSpacing: "0.5px",
                       }}
                     >
-                      Fulfillment & Delivery
+                      Site Delivery Stage · 📍 {destSite}
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
                       <strong style={{ fontSize: "14px", color: "var(--text-primary)" }}>
-                        Delivery Stage:
+                        Current Status:
                       </strong>
                       <Badge>{currentDelivStatus}</Badge>
                     </div>
@@ -487,8 +562,9 @@ export default function PurchasesPage() {
                         onChange={(e) => handleDeliveryStatusChange(selectedPo, e.target.value)}
                       >
                         <option value="Pending">Pending</option>
-                        <option value="Shipped">Shipped</option>
-                        <option value="Delivered">Delivered</option>
+                        <option value="Approved & Preparing">Approved & Preparing</option>
+                        <option value="In Transit">In Transit</option>
+                        <option value="Delivered to Site">Delivered to Site</option>
                       </select>
                     </div>
                   ) : null}
@@ -498,10 +574,11 @@ export default function PurchasesPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   {[
                     { id: "Pending", label: "Pending", icon: "⏳" },
-                    { id: "Shipped", label: "Shipped", icon: "🚚" },
-                    { id: "Delivered", label: "Delivered", icon: "✓" },
+                    { id: "Approved & Preparing", label: "Preparing", icon: "📦" },
+                    { id: "In Transit", label: "In Transit", icon: "🚚" },
+                    { id: "Delivered to Site", label: "Delivered", icon: "✓" },
                   ].map((stage, sIdx) => {
-                    const stages = ["Pending", "Shipped", "Delivered"];
+                    const stages = ["Pending", "Approved & Preparing", "In Transit", "Delivered to Site"];
                     const curIdx = stages.indexOf(currentDelivStatus);
                     const isPassedOrCurrent = curIdx >= sIdx;
                     const isCurrent = curIdx === sIdx;
@@ -512,45 +589,45 @@ export default function PurchasesPage() {
                         type="button"
                         disabled={!isAdmin}
                         onClick={() => isAdmin && handleDeliveryStatusChange(selectedPo, stage.id)}
-                        title={isAdmin ? `Set delivery status to ${stage.label}` : "Admin access required to modify"}
+                        title={isAdmin ? `Set delivery status to ${stage.label}` : "Admin access required"}
                         style={{
                           flex: 1,
-                          padding: "8px 10px",
+                          padding: "8px 6px",
                           borderRadius: "6px",
                           border: isCurrent
-                            ? stage.id === "Delivered"
+                            ? stage.id === "Delivered to Site"
                               ? "2px solid #059669"
-                              : stage.id === "Shipped"
-                              ? "2px solid #2563eb"
-                              : "2px solid #d97706"
+                              : stage.id === "In Transit"
+                              ? "2px solid #7c3aed"
+                              : "2px solid #2563eb"
                             : isPassedOrCurrent
                             ? "1px solid #cbd5e1"
                             : "1px dashed #cbd5e1",
                           background: isCurrent
-                            ? stage.id === "Delivered"
+                            ? stage.id === "Delivered to Site"
                               ? "#ecfdf5"
-                              : stage.id === "Shipped"
-                              ? "#eff6ff"
-                              : "#fffbeb"
+                              : stage.id === "In Transit"
+                              ? "#f5f3ff"
+                              : "#eff6ff"
                             : isPassedOrCurrent
                             ? "#f1f5f9"
                             : "transparent",
                           color: isCurrent
-                            ? stage.id === "Delivered"
+                            ? stage.id === "Delivered to Site"
                               ? "#065f46"
-                              : stage.id === "Shipped"
-                              ? "#1e40af"
-                              : "#92400e"
+                              : stage.id === "In Transit"
+                              ? "#5b21b6"
+                              : "#1e40af"
                             : isPassedOrCurrent
                             ? "#334155"
                             : "var(--text-muted)",
                           fontWeight: isCurrent ? "700" : "500",
-                          fontSize: "12px",
+                          fontSize: "11.5px",
                           cursor: isAdmin ? "pointer" : "default",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: "6px",
+                          gap: "4px",
                           transition: "all 0.15s ease",
                         }}
                       >
@@ -576,9 +653,9 @@ export default function PurchasesPage() {
                   </strong>
                 </div>
                 <div className="drawerMetricCard">
-                  <span className="drawerMetricLabel">Quote Ref</span>
-                  <strong className="drawerMetricVal" style={{ fontSize: "14px" }}>
-                    {selectedPo.quotationNumber || (Array.isArray(selectedPo) ? selectedPo[3] : "—")}
+                  <span className="drawerMetricLabel">Destination Site</span>
+                  <strong className="drawerMetricVal" style={{ fontSize: "13px" }}>
+                    📍 {destSite}
                   </strong>
                 </div>
               </div>
@@ -599,10 +676,10 @@ export default function PurchasesPage() {
                       <tbody>
                         {selectedPo.lineItems.map((item, i) => (
                           <tr key={i}>
-                            <td><strong>{item.materialName}</strong></td>
-                            <td>{item.quantity} {item.unit}</td>
+                            <td><strong>{item.materialName || item.name}</strong></td>
+                            <td>{item.quantity || item.qty} {item.unit || "Pcs"}</td>
                             <td>₹ {item.rate}</td>
-                            <td>₹ {item.total?.toLocaleString()}</td>
+                            <td>₹ {Number((item.quantity || item.qty || 0) * (item.rate || 0)).toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -612,20 +689,30 @@ export default function PurchasesPage() {
               )}
 
               <h4 className="drawerSectionTitle" style={{ marginTop: "20px" }}>
-                Procurement Info
+                Order & Fulfillment Details
               </h4>
               <div className="drawerKvList">
                 <div className="drawerKvRow">
-                  <span className="drawerKvLabel">Destination Warehouse:</span>
-                  <span className="drawerKvVal">{selectedPo.location || "Central Warehouse"}</span>
+                  <span className="drawerKvLabel">Destination Site:</span>
+                  <span className="drawerKvVal">📍 {destSite}</span>
                 </div>
                 <div className="drawerKvRow">
-                  <span className="drawerKvLabel">Settlement Status:</span>
-                  <span className="drawerKvVal">{selectedPo.status || (Array.isArray(selectedPo) ? selectedPo[6] : "Approved")}</span>
+                  <span className="drawerKvLabel">Supplier Approval:</span>
+                  <span className="drawerKvVal">
+                    {isSupApproved ? (
+                      <span style={{ color: "#047857", fontWeight: "700" }}>✓ Approved by Supplier</span>
+                    ) : (
+                      <span style={{ color: "#b45309", fontWeight: "700" }}>⏳ Pending Supplier Approval</span>
+                    )}
+                  </span>
                 </div>
                 <div className="drawerKvRow">
-                  <span className="drawerKvLabel">Delivery Status:</span>
+                  <span className="drawerKvLabel">Delivery to Site:</span>
                   <span className="drawerKvVal"><Badge>{currentDelivStatus}</Badge></span>
+                </div>
+                <div className="drawerKvRow">
+                  <span className="drawerKvLabel">Placed By:</span>
+                  <span className="drawerKvVal">PDV Operations Admin</span>
                 </div>
                 <div className="drawerKvRow">
                   <span className="drawerKvLabel">Remarks:</span>

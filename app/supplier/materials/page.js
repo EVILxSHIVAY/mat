@@ -14,27 +14,31 @@ export default function SupplierMaterialsPage() {
   const [categoryFilter, setCategoryFilter] = useState("All");
 
   useEffect(() => {
-    // Load catalog items relevant to this vendor
+    // Load catalog items relevant to this supplier
     const master = getMasterMaterialCatalog();
     const custom = getStorageData(STORAGE_KEYS.PRODUCTS, []);
 
-    // Filter to items matching this vendor or general hardware catalog
-    const vendorName = user?.supplierName?.toLowerCase() || "";
-    const vendorCode = user?.supplierCode?.toLowerCase() || "";
+    // Filter to items matching this supplier or general materials catalog
+    const supName = user?.supplierName?.toLowerCase() || "";
+    const supCode = user?.supplierCode?.toLowerCase() || "";
 
     const combined = [...master];
     custom.forEach((p, idx) => {
       const pSupplier = Array.isArray(p) ? p[5] : p.supplier;
       if (
         pSupplier &&
-        (pSupplier.toLowerCase().includes(vendorName) ||
-          vendorName.includes(pSupplier.toLowerCase()))
+        (pSupplier.toLowerCase().includes(supName) ||
+          supName.includes(pSupplier.toLowerCase()))
       ) {
         combined.unshift({
           code: Array.isArray(p) ? p[0] : p.code || `PRD-${idx + 1}`,
           name: Array.isArray(p) ? p[1] : p.name,
           category: (Array.isArray(p) ? p[3] : p.category) || "General Materials",
-          unit: (Array.isArray(p) ? p[4] : p.unit) || "Pcs",
+          unit: (() => {
+            const rawU = Array.isArray(p) ? p[4] : p.unit;
+            if (rawU === "Meter" || rawU === "Pcs") return rawU;
+            return String(Array.isArray(p) ? p[1] : p.name).toLowerCase().includes("pipe") ? "Meter" : "Pcs";
+          })(),
           defaultRate: Number(Array.isArray(p) ? p[6] : p.rate) || 150,
           defaultLocation: (Array.isArray(p) ? p[11] : p.location) || "Central Warehouse",
         });
@@ -137,7 +141,7 @@ export default function SupplierMaterialsPage() {
                 <td>₹ {item.defaultRate || 150}</td>
                 <td>{item.defaultLocation}</td>
                 <td>
-                  <Badge status="Active" />
+                  <Badge variant="success">Active</Badge>
                 </td>
               </tr>
             ))}

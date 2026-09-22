@@ -11,13 +11,13 @@ function LoginFormContent() {
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
 
-  const { login } = useAuth();
+  const { user, login } = useAuth();
 
   // Mobile two-step state: "intro" shows branding, "form" shows login
   const [mobileStep, setMobileStep] = useState("intro");
 
   // Form State
-  const [role, setRole] = useState("ADMIN"); // 'ADMIN' | 'SUPPLIER'
+  const [role, setRole] = useState("ADMIN"); // 'ADMIN' | 'SUPPLIER' | 'VENDOR'
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -53,22 +53,27 @@ function LoginFormContent() {
       }
 
       // Successful login -> Redirect based on role and return URL
-      const user = result.user;
-      if (from && !from.startsWith("/login")) {
-        // Only redirect to 'from' if allowed by role
-        if (user.role === "SUPPLIER" && !from.startsWith("/supplier")) {
-          router.push("/supplier");
-        } else {
-          router.push(from);
-        }
+      const loggedUser = result.user;
+      let targetPath = "/";
+      if (loggedUser.role === "SUPPLIER") {
+        targetPath = "/supplier";
+      } else if (loggedUser.role === "VENDOR") {
+        targetPath = "/vendor";
       } else {
-        if (user.role === "ADMIN") {
-          router.push("/");
-        } else {
-          router.push("/supplier");
+        targetPath = "/";
+      }
+
+      if (from && !from.startsWith("/login")) {
+        if (loggedUser.role === "SUPPLIER" && from.startsWith("/supplier")) {
+          targetPath = from;
+        } else if (loggedUser.role === "VENDOR" && from.startsWith("/vendor")) {
+          targetPath = from;
+        } else if (loggedUser.role === "ADMIN") {
+          targetPath = from;
         }
       }
-      router.refresh();
+
+      window.location.href = targetPath;
     } catch (err) {
       setErrorMessage("Something went wrong. Please check your connection and try again.");
       setIsSubmitting(false);
@@ -82,9 +87,38 @@ function LoginFormContent() {
     if (targetRole === "ADMIN") {
       setEmail("admin@pdv.com");
       setPassword("Admin@PDV2026!");
-    } else {
-      setEmail("vasu@example.com");
+    } else if (targetRole === "SUPPLIER") {
+      let supEmail = "";
+      if (typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem("pdv_app_suppliers");
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (parsed.length > 0) {
+            const first = parsed[0];
+            supEmail = Array.isArray(first) ? first[4] : first.email || (first.code ? `${first.code.toLowerCase()}@pdv.com` : "");
+          }
+        } catch (e) {}
+      }
+      if (!supEmail) {
+        setErrorMessage("No suppliers registered in Admin Suppliers Directory yet. Please register a supplier in the Admin Panel first.");
+        return;
+      }
+      setEmail(supEmail);
       setPassword("Supplier@2026!");
+    } else {
+      let vndEmail = "vendor@pdv.com";
+      if (typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem("pdv_app_vendors");
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (parsed.length > 0) {
+            const first = parsed[0];
+            vndEmail = first.email || first.code || vndEmail;
+          }
+        } catch (e) {}
+      }
+      setEmail(vndEmail);
+      setPassword("Vendor@2026!");
     }
   };
 
@@ -116,7 +150,7 @@ function LoginFormContent() {
             </h2>
 
             <p className="brandHeroSubtitle">
-              Real-time inventory valuations, dispatch tracking, verified contractor consumption,
+              Real-time inventory valuations, dispatch tracking, verified vendor consumption,
               and dedicated supplier portals built for infrastructure projects.
             </p>
 
@@ -195,6 +229,40 @@ function LoginFormContent() {
               </p>
             </div>
 
+            {/* Current Session Banner if user already logged in */}
+            {user && (
+              <div
+                style={{
+                  marginBottom: "16px",
+                  padding: "10px 14px",
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  color: "#1e40af",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span>
+                  Currently signed in as <b>{user.name}</b> ({user.role})
+                </span>
+                <a
+                  href={user.role === "SUPPLIER" ? "/supplier" : user.role === "VENDOR" ? "/vendor" : "/"}
+                  style={{
+                    fontWeight: "600",
+                    color: "#2563eb",
+                    textDecoration: "none",
+                  }}
+                >
+                  Go to Dashboard →
+                </a>
+              </div>
+            )}
+
             {/* Role Segmented Selector */}
             <div className="roleSelectorGroup">
               <span className="roleSelectorLabel">Select Workspace Access Role</span>
@@ -226,6 +294,20 @@ function LoginFormContent() {
                   <span className="roleTabIcon">🏢</span>
                   <span>Supplier</span>
                 </button>
+
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={role === "VENDOR"}
+                  className={`roleTabBtn ${role === "VENDOR" ? "active" : ""}`}
+                  onClick={() => {
+                    setRole("VENDOR");
+                    setErrorMessage("");
+                  }}
+                >
+                  <span className="roleTabIcon">👷</span>
+                  <span>Vendor</span>
+                </button>
               </div>
             </div>
 
@@ -242,7 +324,11 @@ function LoginFormContent() {
               {/* Email Input */}
               <div className="formFieldGroup">
                 <label className="fieldLabel" htmlFor="loginEmail">
-                  {role === "ADMIN" ? "Admin Email Address" : "Registered Supplier Email"}
+                  {role === "ADMIN"
+                    ? "Admin Email Address"
+                    : role === "SUPPLIER"
+                    ? "Registered Supplier Email"
+                    : "Registered Vendor Email"}
                 </label>
                 <div className="inputWrapper">
                   <input
@@ -252,7 +338,11 @@ function LoginFormContent() {
                     autoComplete="email"
                     className="textInput"
                     placeholder={
-                      role === "ADMIN" ? "Enter your admin email" : "Enter your registered email"
+                      role === "ADMIN"
+                        ? "Enter your admin email"
+                        : role === "SUPPLIER"
+                        ? "Enter your supplier email"
+                        : "Enter your registered vendor email"
                     }
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -314,7 +404,13 @@ function LoginFormContent() {
                     <span>Signing in...</span>
                   </>
                 ) : (
-                  <span>{role === "ADMIN" ? "Sign in as Admin" : "Sign in as Supplier"}</span>
+                  <span>
+                    {role === "ADMIN"
+                      ? "Sign in as Admin"
+                      : role === "SUPPLIER"
+                      ? "Sign in as Supplier"
+                      : "Sign in as Vendor"}
+                  </span>
                 )}
               </button>
             </form>
@@ -338,7 +434,7 @@ function LoginFormContent() {
               </div>
               <div className="demoRow">
                 <span>
-                  Supplier: <code>vasu@example.com</code> / <code>Supplier@2026!</code>
+                  Supplier: <i>Registered suppliers from Admin Directory</i> / <code>Supplier@2026!</code>
                 </span>
                 <button
                   type="button"
@@ -348,6 +444,21 @@ function LoginFormContent() {
                   Auto-fill
                 </button>
               </div>
+              <div className="demoRow">
+                <span>
+                  Vendor: <code>vendor@pdv.com</code> (or registered email) / <code>Vendor@2026!</code>
+                </span>
+                <button
+                  type="button"
+                  className="quickFillBtn"
+                  onClick={() => handleQuickFill("VENDOR")}
+                >
+                  Auto-fill
+                </button>
+              </div>
+              <p style={{ margin: "10px 0 0", fontSize: "11.5px", color: "var(--muted)", lineHeight: 1.4 }}>
+                ℹ️ Any vendor registered in <b>Admin &gt; Vendors Registry</b> can sign in using their registered email and <code>Vendor@2026!</code>.
+              </p>
             </div>
           </div>
         </section>

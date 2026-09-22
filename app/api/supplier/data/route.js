@@ -33,19 +33,21 @@ export async function POST(request) {
     // 1. Locate Supplier Profile from Master
     const foundMaster = DEFAULT_SUPPLIERS.find(
       (s) =>
-        s[0].toLowerCase() === supplierCode.toLowerCase() ||
-        s[1].toLowerCase() === supplierName.toLowerCase()
+        (supplierCode && s[0].toLowerCase() === supplierCode.toLowerCase()) ||
+        (supplierName && s[1].toLowerCase() === supplierName.toLowerCase())
     );
 
-    const profile = foundMaster
+    const targetSup = foundMaster || (session.role === "ADMIN" ? DEFAULT_SUPPLIERS[0] : null);
+
+    const profile = targetSup
       ? {
-          code: foundMaster[0],
-          companyName: foundMaster[1],
-          contactPerson: foundMaster[2],
-          mobile: foundMaster[3],
-          email: foundMaster[4],
-          gst: foundMaster[5],
-          status: foundMaster[6] || "Active",
+          code: targetSup[0],
+          companyName: targetSup[1],
+          contactPerson: targetSup[2],
+          mobile: targetSup[3],
+          email: targetSup[4],
+          gst: targetSup[5],
+          status: targetSup[6] || "Active",
         }
       : {
           code: supplierCode || "SUP-001",
@@ -59,25 +61,31 @@ export async function POST(request) {
 
     // 2. Strict Server-Side Data Isolation:
     // Only return records where the supplier matches the authenticated session
-    const isSupplierMatch = (recordSup) => {
+    const isSupplierMatch = (recordSup, recordSupCode) => {
+      if (recordSupCode && profile.code && String(recordSupCode).toLowerCase().trim() === String(profile.code).toLowerCase().trim()) {
+        return true;
+      }
       if (!recordSup) return false;
       const cleanRecord = String(recordSup).toLowerCase().trim();
       const cleanTarget = String(profile.companyName).toLowerCase().trim();
       return (
+        cleanRecord === cleanTarget ||
         cleanRecord.includes(cleanTarget) ||
         cleanTarget.includes(cleanRecord) ||
-        cleanRecord.includes(profile.code.toLowerCase())
+        (profile.code && cleanRecord.includes(profile.code.toLowerCase().trim()))
       );
     };
 
     const isolatedPurchases = purchases.filter((po) => {
       const sup = po.supplier || (Array.isArray(po) ? po[2] : "");
-      return isSupplierMatch(sup);
+      const supCode = po.supplierCode || "";
+      return isSupplierMatch(sup, supCode);
     });
 
     const isolatedBills = bills.filter((b) => {
       const sup = b.supplierName || b.supplier || "";
-      return isSupplierMatch(sup);
+      const supCode = b.supplierCode || "";
+      return isSupplierMatch(sup, supCode);
     });
 
     const isolatedProducts = products.filter((p) => {

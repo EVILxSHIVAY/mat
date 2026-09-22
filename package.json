@@ -2,11 +2,14 @@
   "name": "pdv_form",
   "version": "0.1.0",
   "private": true,
+  "main": "main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "desktop:run": "electron .",
+    "desktop:build": "npm run build && electron-builder"
   },
   "dependencies": {
     "next": "16.3.3",
@@ -15,7 +18,23 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.3"
+  },
+  "build": {
+    "appId": "com.shivam.pdvform",
+    "productName": "PDV Form",
+    "files": [
+      "out/**/*",
+      "main.js"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    }
   }
 }

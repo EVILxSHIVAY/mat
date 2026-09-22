@@ -81,7 +81,7 @@ export default function SupplierProfilePage() {
           <div className="profileFieldRow">
             <span className="profileFieldLabel">Account Status</span>
             <div style={{ marginTop: "4px" }}>
-              <Badge status={p.status || "Active"} />
+              <Badge>{p.status || "Active"}</Badge>
             </div>
           </div>
         </div>

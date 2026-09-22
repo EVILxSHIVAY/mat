@@ -14,23 +14,22 @@ const adminNavigationSections = [
     items: [
       { href: "/", label: "Dashboard", icon: "⌂" },
       { href: "/inventory", label: "Inventory", icon: "📦" },
-      { href: "/purchases", label: "Purchases", icon: "▣" },
-      { href: "/material-requests", label: "Requests", icon: "📋" },
-      { href: "/material-issue", label: "Issue Materials", icon: "↗" },
-      { href: "/material-consumption", label: "Consumption", icon: "◔" },
+      { href: "/purchases", label: "Purchases (Suppliers)", icon: "▣" },
+      { href: "/material-requests", label: "Vendor Requests", icon: "📋" },
+      { href: "/material-issue", label: "Issue to Vendors", icon: "↗" },
+      { href: "/material-consumption", label: "Site Consumption", icon: "◔" },
       { href: "/returns", label: "Returns", icon: "🔄" },
     ],
   },
   {
     title: "DIRECTORIES",
     items: [
-      { href: "/party-ledger", label: "Party Ledger", icon: "⚖" },
-      { href: "/parties", label: "Parties", icon: "🏗" },
+      { href: "/vendors", label: "Vendors & Sites", icon: "👷" },
       { href: "/suppliers", label: "Suppliers", icon: "♙" },
-      { href: "/products", label: "Products", icon: "▦" },
+      { href: "/party-ledger", label: "Party Ledger", icon: "⚖" },
+      { href: "/products", label: "Products Catalog", icon: "▦" },
       { href: "/upload", label: "Upload Vault", icon: "⇧" },
       { href: "/reports", label: "Reports & Sync", icon: "▤" },
-      { href: "/supplier", label: "Supplier Portal", icon: "🏢" },
     ],
   },
 ];
@@ -41,9 +40,23 @@ const supplierNavigationSections = [
     title: "SUPPLIER PORTAL",
     items: [
       { href: "/supplier", label: "Dashboard", icon: "🏢" },
-      { href: "/supplier/orders", label: "Orders", icon: "📋" },
-      { href: "/supplier/materials", label: "Materials", icon: "📦" },
-      { href: "/supplier/profile", label: "Profile", icon: "⚙" },
+      { href: "/supplier/orders", label: "Purchase Orders", icon: "📋" },
+      { href: "/supplier/materials", label: "Supplied Materials", icon: "📦" },
+      { href: "/supplier/profile", label: "Supplier Profile", icon: "⚙" },
+    ],
+  },
+];
+
+// Vendor / Contractor Dedicated Navigation Menu
+const vendorNavigationSections = [
+  {
+    title: "VENDOR PORTAL",
+    items: [
+      { href: "/vendor", label: "Dashboard", icon: "👷" },
+      { href: "/vendor/requests", label: "Material Requests", icon: "📋" },
+      { href: "/vendor/issued", label: "Issued to Me", icon: "📦" },
+      { href: "/vendor/consumption", label: "Site Consumption", icon: "◔" },
+      { href: "/vendor/profile", label: "Profile & Sites", icon: "⚙" },
     ],
   },
 ];
@@ -51,23 +64,30 @@ const supplierNavigationSections = [
 export default function Shell({ children }) {
   const currentPath = usePathname();
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout, quickSwitchRole } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace(`/login?from=${encodeURIComponent(currentPath)}`);
+      window.location.href = `/login?from=${encodeURIComponent(currentPath)}`;
     }
-  }, [isLoading, isAuthenticated, currentPath, router]);
+  }, [isLoading, isAuthenticated, currentPath]);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && user?.role === "SUPPLIER" && !currentPath.startsWith("/supplier")) {
-      router.replace("/supplier");
+    if (!isLoading && isAuthenticated) {
+      if (user?.role === "SUPPLIER" && !currentPath.startsWith("/supplier")) {
+        window.location.href = "/supplier";
+      } else if (user?.role === "VENDOR" && !currentPath.startsWith("/vendor")) {
+        window.location.href = "/vendor";
+      }
     }
-  }, [isLoading, isAuthenticated, user, currentPath, router]);
+  }, [isLoading, isAuthenticated, user, currentPath]);
 
   const isSupplier = user?.role === "SUPPLIER";
+  const isVendor = user?.role === "VENDOR";
   const activeNavigationSections = isSupplier
     ? supplierNavigationSections
+    : isVendor
+    ? vendorNavigationSections
     : adminNavigationSections;
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -137,11 +157,12 @@ export default function Shell({ children }) {
   }
 
   // Find current active page title
-  let pageTitle = isSupplier ? "Supplier Portal" : "Dashboard";
+  let pageTitle = isSupplier ? "Supplier Portal" : isVendor ? "Vendor Portal" : "Dashboard";
   for (const section of activeNavigationSections) {
     const found = section.items.find((item) => {
-      if (item.href === "/" && !isSupplier) return currentPath === "/";
+      if (item.href === "/" && !isSupplier && !isVendor) return currentPath === "/";
       if (item.href === "/supplier" && isSupplier) return currentPath === "/supplier";
+      if (item.href === "/vendor" && isVendor) return currentPath === "/vendor";
       return currentPath.startsWith(item.href);
     });
     if (found) {
@@ -163,6 +184,8 @@ export default function Shell({ children }) {
         .slice(0, 2)
     : isSupplier
     ? "VE"
+    : isVendor
+    ? "AC"
     : "SA";
 
   return (
@@ -181,13 +204,13 @@ export default function Shell({ children }) {
       <aside className={`sidebar ${isMobileMenuOpen ? "open" : ""}`}>
         {/* Brand Logo & Name */}
         <div className="brand">
-          <span className="brandMark">{isSupplier ? "🏢" : "P"}</span>
+          <span className="brandMark">{isSupplier ? "🏢" : isVendor ? "👤" : "P"}</span>
           <div className="brandTextWrapper">
             <span className="brandName">
-              {isSupplier ? "PDV Supplier" : "PDV Solutions"}
+              {isSupplier ? "PDV Supplier" : isVendor ? "PDV Vendor" : "PDV Solutions"}
             </span>
             <span className="brandSub">
-              {isSupplier ? "Supplier Portal" : "Material Management"}
+              {isSupplier ? "Supplier Portal" : isVendor ? "Vendor Portal" : "Material Management"}
             </span>
           </div>
           <button
@@ -208,7 +231,10 @@ export default function Shell({ children }) {
                 {section.items.map((item) => {
                   const isActive =
                     currentPath === item.href ||
-                    (item.href !== "/" && item.href !== "/supplier" && currentPath.startsWith(item.href));
+                    (item.href !== "/" &&
+                      item.href !== "/supplier" &&
+                      item.href !== "/vendor" &&
+                      currentPath.startsWith(item.href));
 
                   return (
                     <Link
@@ -231,12 +257,14 @@ export default function Shell({ children }) {
         <div className="sideFoot">
           <div className="avatar">{userInitials}</div>
           <div className="userInfoBlock">
-            <b title={user?.name || (isSupplier ? "Vasu Enterprises" : "Administrator")}>
-              {user?.name || (isSupplier ? "Vasu Enterprises" : "Shyam Aggarwal")}
+            <b title={user?.name || (isSupplier ? "Supplier" : isVendor ? "Vendor" : "Administrator")}>
+              {user?.name || (isSupplier ? "Supplier" : isVendor ? "Vendor" : "Administrator")}
             </b>
             <small>
               {isSupplier
-                ? `Supplier (${user?.supplierCode || "SUP-001"})`
+                ? `Supplier ${user?.supplierCode ? `(${user.supplierCode})` : ""}`
+                : isVendor
+                ? `Vendor ${user?.vendorCode ? `(${user.vendorCode})` : ""}`
                 : "Administrator (Procurement)"}
             </small>
           </div>
@@ -278,11 +306,11 @@ export default function Shell({ children }) {
 
           {/* Breadcrumb Title */}
           <div className="crumb">
-            {isSupplier ? "Supplier Portal" : "Material Management"} <span>/</span> {pageTitle}
+            {isSupplier ? "Supplier Portal" : isVendor ? "Vendor Portal" : "Material Management"} <span>/</span> {pageTitle}
           </div>
 
           {/* Omnisearch Quick Button */}
-          {!isSupplier && (
+          {!isSupplier && !isVendor && (
             <button
               type="button"
               className="headerSearchBar"
@@ -297,7 +325,7 @@ export default function Shell({ children }) {
 
           {/* Header Right Side */}
           <div className="headRight">
-            {!isSupplier && (
+            {!isSupplier && !isVendor && (
               <Link
                 href="/reports"
                 className="headerSyncBtn"
@@ -317,10 +345,10 @@ export default function Shell({ children }) {
               >
                 <div className="headAvatar">{userInitials}</div>
                 <span className="headUserName">
-                  {user?.name ? user.name.split(" ")[0] : isSupplier ? "Supplier" : "Admin"}
+                  {user?.name ? user.name.split(" ")[0] : isSupplier ? "Supplier" : isVendor ? "Vendor" : "Admin"}
                 </span>
-                <span className={`headRolePill ${isSupplier ? "supplier" : "admin"}`}>
-                  {isSupplier ? "Supplier" : "Admin"}
+                <span className={`headRolePill ${isSupplier ? "supplier" : isVendor ? "vendor" : "admin"}`}>
+                  {isSupplier ? "Supplier" : isVendor ? "Vendor" : "Admin"}
                 </span>
                 <span className="caret">▾</span>
               </button>
@@ -328,11 +356,13 @@ export default function Shell({ children }) {
               {isUserMenuOpen && (
                 <div className="userMenuPopup">
                   <div className="userMenuHeader">
-                    <b>{user?.name || (isSupplier ? "Vasu Enterprises" : "Shyam Aggarwal")}</b>
-                    <small>{user?.email || (isSupplier ? "supplier1@example.com" : "admin@pdv.com")}</small>
+                    <b>{user?.name || (isSupplier ? "Supplier" : isVendor ? "Vendor" : "Administrator")}</b>
+                    <small>{user?.email || "admin@pdv.com"}</small>
                     <span className="userMenuRoleBadge">
                       {isSupplier
-                        ? `🏢 Supplier Portal (${user?.supplierCode || "SUP-001"})`
+                        ? `🏢 Supplier Portal ${user?.supplierCode ? `(${user.supplierCode})` : ""}`
+                        : isVendor
+                        ? `👷 Vendor Portal ${user?.vendorCode ? `(${user.vendorCode})` : ""}`
                         : "🛡️ Administrator"}
                     </span>
                   </div>
@@ -346,6 +376,14 @@ export default function Shell({ children }) {
                     >
                       <span>🏢</span> Supplier Profile & Details
                     </Link>
+                  ) : isVendor ? (
+                    <Link
+                      href="/vendor/profile"
+                      className="userMenuItem"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      <span>⚙</span> Vendor Profile & Sites
+                    </Link>
                   ) : (
                     <Link
                       href="/reports"
@@ -354,6 +392,26 @@ export default function Shell({ children }) {
                     >
                       <span>📊</span> Reports & Cloud Hub
                     </Link>
+                  )}
+
+                  {/* Persona Quick Switcher: Only shown for non-admin to switch back to Admin */}
+                  {user?.role !== "ADMIN" && (
+                    <>
+                      <div className="userMenuDivider" />
+                      <div style={{ padding: "6px 12px 2px", fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        Switch Workspace
+                      </div>
+                      <button
+                        type="button"
+                        className="userMenuItem"
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          quickSwitchRole("ADMIN");
+                        }}
+                      >
+                        <span>🛡️</span> Switch to Admin Workspace
+                      </button>
+                    </>
                   )}
 
                   <div className="userMenuDivider" />

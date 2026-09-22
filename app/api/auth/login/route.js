@@ -9,7 +9,7 @@ import {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { email, password, role, rememberMe } = body;
+    const { email, password, role, rememberMe, registeredVendors = [], registeredSuppliers = [] } = body;
 
     // Validate input presence
     if (!email || !password) {
@@ -22,8 +22,8 @@ export async function POST(request) {
       );
     }
 
-    // Verify credentials with role match
-    const result = verifyCredentials(email, password, role);
+    // Verify credentials with role match and dynamic registries
+    const result = verifyCredentials(email, password, role, { registeredVendors, registeredSuppliers });
     if (!result.success) {
       return NextResponse.json(
         {
@@ -51,6 +51,12 @@ export async function POST(request) {
         role: user.role,
         supplierCode: user.supplierCode || null,
         supplierName: user.supplierName || null,
+        vendorCode: user.vendorCode || null,
+        vendorName: user.vendorName || null,
+        mobile: user.mobile || null,
+        gst: user.gst || null,
+        trade: user.trade || null,
+        sites: user.sites || [],
         department: user.department || null,
       },
     });

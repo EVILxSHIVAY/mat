@@ -39,15 +39,20 @@ export default function SuppliersPage() {
   });
 
   useEffect(() => {
-    let saved = getStorageData(STORAGE_KEYS.SUPPLIERS, []);
-    if (saved.length === 0) {
-      saved = DEFAULT_SUPPLIERS;
-      setStorageData(STORAGE_KEYS.SUPPLIERS, DEFAULT_SUPPLIERS);
-    }
+    const saved = getStorageData(STORAGE_KEYS.SUPPLIERS, []);
     setSuppliers(saved);
     setPurchases(getStorageData(STORAGE_KEYS.PURCHASES, []));
     setPayments(getStorageData(STORAGE_KEYS.PAYMENTS, []));
     setBills(getStorageData(STORAGE_KEYS.BILLS, []));
+    if (saved.length > 0) {
+      try {
+        fetch("/api/auth/sync-accounts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ suppliers: saved }),
+        }).catch(() => {});
+      } catch (e) {}
+    }
   }, []);
 
   useEffect(() => {
@@ -62,6 +67,13 @@ export default function SuppliersPage() {
   const saveList = (list) => {
     setSuppliers(list);
     setStorageData(STORAGE_KEYS.SUPPLIERS, list);
+    try {
+      fetch("/api/auth/sync-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suppliers: list }),
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   const handleOpenAdd = () => {

@@ -6,7 +6,8 @@ import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";
 import DetailDrawer from "@/components/ui/DetailDrawer";
 import { exportToExcel } from "@/lib/exportToExcel";
-import { calculateLiveInventory } from "@/lib/dataService";
+import { calculateLiveInventory, updateProductStock, resetProductStock } from "@/lib/dataService";
+import StockAdjustModal from "./StockAdjustModal";
 import "@/components/ui/ui.css";
 import "./inventory.css";
 
@@ -32,9 +33,38 @@ export default function InventoryView({ initialFilter = "" }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [drawerTab, setDrawerTab] = useState("overview");
 
+  // Stock Adjustment Modal state
+  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [adjustingProduct, setAdjustingProduct] = useState(null);
+
+  const refreshInventory = () => {
+    const fresh = calculateLiveInventory();
+    setInventoryList(fresh);
+    if (selectedProduct) {
+      const updatedSelected = fresh.find(
+        (p) => p.code === selectedProduct.code || p.name === selectedProduct.name
+      );
+      if (updatedSelected) setSelectedProduct(updatedSelected);
+    }
+  };
+
   useEffect(() => {
-    setInventoryList(calculateLiveInventory());
+    refreshInventory();
   }, []);
+
+  // Listen for custom stock update events
+  useEffect(() => {
+    const handleStockUpdated = () => {
+      refreshInventory();
+    };
+    window.addEventListener("pdv_stock_updated", handleStockUpdated);
+    return () => window.removeEventListener("pdv_stock_updated", handleStockUpdated);
+  }, [selectedProduct]);
+
+  const handleOpenAdjustModal = (product = null) => {
+    setAdjustingProduct(product);
+    setIsAdjustModalOpen(true);
+  };
 
   // Filtered dataset
   const filteredInventory = useMemo(() => {
@@ -122,6 +152,14 @@ export default function InventoryView({ initialFilter = "" }) {
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", width: "100%" }}>
             <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={handleExport}>
               ⤓ Export Stock
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ flex: 1, whiteSpace: "nowrap" }}
+              onClick={() => handleOpenAdjustModal(null)}
+            >
+              + Add Quantity
             </button>
           </div>
         }
@@ -236,17 +274,29 @@ export default function InventoryView({ initialFilter = "" }) {
                   <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                     📍 {item.location}
                   </span>
-                  <button
-                    type="button"
-                    className="actionBtn view"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedProduct(item);
-                      setDrawerTab("overview");
-                    }}
-                  >
-                    Inspect History →
-                  </button>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      className="actionBtn edit"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenAdjustModal(item);
+                      }}
+                    >
+                      + Add Qty
+                    </button>
+                    <button
+                      type="button"
+                      className="actionBtn view"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProduct(item);
+                        setDrawerTab("overview");
+                      }}
+                    >
+                      Inspect →
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -296,17 +346,30 @@ export default function InventoryView({ initialFilter = "" }) {
                     <td>{item.location}</td>
                     <td>₹ {item.rate}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="actionBtn view"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedProduct(item);
-                          setDrawerTab("overview");
-                        }}
-                      >
-                        Inspect History →
-                      </button>
+                      <div className="actionBtnGroup">
+                        <button
+                          type="button"
+                          className="actionBtn edit"
+                          title="Add quantity or edit price"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenAdjustModal(item);
+                          }}
+                        >
+                          + Add Qty / Price
+                        </button>
+                        <button
+                          type="button"
+                          className="actionBtn view"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedProduct(item);
+                            setDrawerTab("overview");
+                          }}
+                        >
+                          Inspect →
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -424,6 +487,17 @@ export default function InventoryView({ initialFilter = "" }) {
                     <span className="drawerMetricLabel">Standard Rate</span>
                     <strong className="drawerMetricVal">₹ {selectedProduct.rate}</strong>
                   </div>
+                </div>
+
+                <div style={{ marginTop: "14px" }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                    onClick={() => handleOpenAdjustModal(selectedProduct)}
+                  >
+                    <span>➕</span> Add Quantity & Edit Price
+                  </button>
                 </div>
 
                 <h4 className="drawerSectionTitle">Material Master Data</h4>
@@ -553,6 +627,15 @@ export default function InventoryView({ initialFilter = "" }) {
           </div>
         )}
       </DetailDrawer>
+
+      {/* Stock Adjustment Modal */}
+      <StockAdjustModal
+        isOpen={isAdjustModalOpen}
+        onClose={() => setIsAdjustModalOpen(false)}
+        products={inventoryList}
+        initialProduct={adjustingProduct}
+        onStockUpdated={() => refreshInventory()}
+      />
     </Shell>
   );
 }

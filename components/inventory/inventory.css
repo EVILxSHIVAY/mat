@@ -96,3 +96,158 @@
 .timelineQty.used {
   color: var(--green-text);
 }
+
+/* ==========================================================================
+   Stock Adjustment UI, Badges & Inline Quick Edit
+   ========================================================================== */
+
+.stockNumberRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.stockBadgeManual {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.quickEditTrigger {
+  opacity: 0.55;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.quickEditTrigger:hover {
+  opacity: 1;
+  background: var(--bg-subtle, #f1f5f9);
+  color: var(--brand-600);
+}
+
+.inlineStockEdit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inlineStockInput {
+  width: 78px;
+  padding: 4px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  border: 2px solid var(--brand-500, #3b82f6);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text-primary);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.inlineStockBtn {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.inlineStockBtn.save {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.inlineStockBtn.save:hover {
+  background: #059669;
+}
+
+.inlineStockBtn.cancel {
+  background: var(--surface-card, #ffffff);
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
+}
+
+.inlineStockBtn.cancel:hover {
+  background: var(--bg-subtle, #f1f5f9);
+}
+
+.actionBtnGroup {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.actionBtn.edit {
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--brand-600, #2563eb);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  font-weight: 600;
+  padding: 5px 9px;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.actionBtn.edit:hover {
+  background: var(--brand-600, #2563eb);
+  color: #ffffff;
+}
+
+.stockAuditBox {
+  background: var(--bg-subtle, #f8fafc);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 16px;
+}
+
+.stockAuditHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.stockAuditTitle {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stockAuditItem {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border-default);
+}
+
+.stockAuditItem:last-child {
+  border-bottom: none;
+}
+

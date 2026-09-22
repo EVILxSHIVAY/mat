@@ -1,8 +1,9 @@
 "use client";
 
-export function Badge({ children, variant }) {
-  if (!children) return null;
-  const val = String(children).trim();
+export function Badge({ children, status, variant }) {
+  const content = children ?? status;
+  if (!content) return null;
+  const val = String(content).trim();
   const lower = val.toLowerCase();
 
   // Classify badge variant if not explicitly provided

@@ -27,6 +27,9 @@ export async function GET(request) {
       role: session.role,
       supplierCode: session.supplierCode || null,
       supplierName: session.supplierName || null,
+      vendorCode: session.vendorCode || null,
+      vendorName: session.vendorName || null,
+      sites: session.sites || [],
       department: session.department || null,
     },
   });

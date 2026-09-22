@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { fields } from "@/data/fields";
+import { DEFAULT_VENDORS } from "@/data/defaultVendors";
 import History from "./History";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
+import { calculateLiveInventory } from "@/lib/dataService";
 import "@/components/ui/ui.css";
 import "./material-issue.css";
 
@@ -88,14 +90,10 @@ function categorizeMaterial(name) {
   return "General Materials";
 }
 
-// Unit Classifier Helper
+// Unit Classifier Helper (Restricted strictly to Meter for pipe and Pcs for everything else)
 function inferUnit(name) {
-  const n = name.toLowerCase();
-  if (n.includes("(mtr)") || n.includes(" mtr")) return "Mtr";
-  if (n.includes("(pair)") || n.includes("pair")) return "Pair";
-  if (n.includes(" kg") || n.includes("kg")) return "Kg";
-  if (n.includes("role") || n.includes("roll")) return "Roll";
-  if (n.includes("no") || n.includes("8 no")) return "Nos";
+  const n = String(name || "").toLowerCase();
+  if (n.includes("pipe")) return "Meter";
   return "Pcs";
 }
 
@@ -165,22 +163,41 @@ export default function MaterialIssueForm() {
   const [notification, setNotification] = useState({ type: "", text: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState(0);
+  const [liveInventory, setLiveInventory] = useState([]);
 
   const searchInputRef = useRef(null);
   const dropdownRef = useRef(null);
   const qtyInputRefs = useRef({});
 
-  // 1. Initial Data Loading (Known Parties, Recent Items)
+  // Helper to query available inventory stock
+  const getStockForItem = (materialName) => {
+    if (!materialName || !liveInventory.length) return 0;
+    const key = materialName.toLowerCase().trim();
+    const found = liveInventory.find(
+      (inv) => inv.name && inv.name.toLowerCase().trim() === key
+    );
+    return found ? Number(found.availableStock) || 0 : 0;
+  };
+
   useEffect(() => {
     try {
-      // Load parties from Suppliers
-      const rawSuppliers = localStorage.getItem("pdv_app_suppliers");
-      const partySet = new Set(["Main Site", "Central Warehouse", "Vrindavan Site A", "Site B - Pipeline"]);
-      if (rawSuppliers) {
-        const parsed = JSON.parse(rawSuppliers);
+      setLiveInventory(calculateLiveInventory());
+    } catch (e) {
+      console.warn("Failed to load inventory:", e);
+    }
+  }, [refreshHistoryTrigger]);
+
+  // 1. Initial Data Loading (Known Vendors, Recent Items, Query Pre-fill)
+  useEffect(() => {
+    try {
+      // Load known vendors/contractors to whom materials are issued
+      const rawVendors = localStorage.getItem("pdv_app_vendors");
+      const partySet = new Set();
+      if (rawVendors) {
+        const parsed = JSON.parse(rawVendors);
         if (Array.isArray(parsed)) {
-          parsed.forEach((row) => {
-            if (row[1]) partySet.add(row[1]);
+          parsed.forEach((v) => {
+            if (v.name) partySet.add(v.name);
           });
         }
       }
@@ -202,6 +219,42 @@ export default function MaterialIssueForm() {
           "Hose Clamp",
           "Coupler 20mm"
         ]);
+      }
+
+      // Check if arriving from a Vendor Material Request
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const vendorParam = urlParams.get("vendor");
+        const matParam = urlParams.get("material");
+        const qtyParam = urlParams.get("qty");
+        const unitParam = urlParams.get("unit");
+        const reqId = urlParams.get("reqId");
+
+        if (vendorParam) {
+          setVoucherDetails((prev) => ({
+            ...prev,
+            issuedTo: vendorParam,
+            reqId: reqId || "",
+          }));
+        }
+
+        if (matParam) {
+          setSelectedMaterials((prev) => {
+            if (prev.some((m) => m.name.toLowerCase() === matParam.toLowerCase())) {
+              return prev;
+            }
+            return [
+              {
+                id: `req-mat-${Date.now()}`,
+                name: matParam,
+                category: categorizeMaterial(matParam),
+                unit: unitParam || inferUnit(matParam),
+                qty: Number(qtyParam) || 1,
+              },
+              ...prev,
+            ];
+          });
+        }
       }
     } catch (e) {
       console.warn("Storage read error:", e);
@@ -436,6 +489,13 @@ export default function MaterialIssueForm() {
           unit: m.unit,
           category: m.category,
         })),
+        items: selectedMaterials.map((m) => ({
+          name: m.name,
+          qty: Number(m.qty),
+          quantity: Number(m.qty),
+          unit: m.unit,
+          category: m.category,
+        })),
         createdAt: new Date().toISOString(),
       };
 
@@ -445,6 +505,49 @@ export default function MaterialIssueForm() {
       const existingList = existingRaw ? JSON.parse(existingRaw) : [];
       const updatedList = [newRecord, ...existingList];
       localStorage.setItem(storageKey, JSON.stringify(updatedList));
+
+      // If linked to a Vendor Material Request, update issued progress and status
+      if (voucherDetails.reqId) {
+        try {
+          const reqRaw = localStorage.getItem("pdv_app_material_needed");
+          if (reqRaw) {
+            const reqList = JSON.parse(reqRaw);
+            const updatedReqs = reqList.map((r) => {
+              if (r.id === voucherDetails.reqId) {
+                const requestedTotal = Number(r.quantityNeeded) || Number(r.quantity) || 1;
+                const priorIssued = Number(r.issuedQty) || 0;
+                // find matching material qty in selectedMaterials
+                const matchedMat = selectedMaterials.find(
+                  (m) => m.name.toLowerCase().trim() === (r.materialName || "").toLowerCase().trim()
+                );
+                const qtyIssuedThisTime = matchedMat ? Number(matchedMat.qty) || 0 : totalUnitsCount;
+                const newTotalIssued = priorIssued + qtyIssuedThisTime;
+                const remaining = Math.max(0, requestedTotal - newTotalIssued);
+                const isFullyIssued = newTotalIssued >= requestedTotal;
+
+                return {
+                  ...r,
+                  status: isFullyIssued ? "Issued" : "Partially Issued",
+                  issuedQty: newTotalIssued,
+                  remainingNeeded: remaining,
+                  challanNo: recordNumber,
+                  issueChallanNo: recordNumber,
+                  issuedAt: new Date().toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                };
+              }
+              return r;
+            });
+            localStorage.setItem("pdv_app_material_needed", JSON.stringify(updatedReqs));
+          }
+        } catch (e) {
+          console.warn("Could not link request to issue:", e);
+        }
+      }
 
       // Success notification
       setNotification({
@@ -624,7 +727,7 @@ export default function MaterialIssueForm() {
               </label>
               <input
                 type="text"
-                placeholder="Select site destination, party or contractor..."
+                placeholder="Select site destination, vendor or party..."
                 value={voucherDetails.issuedTo}
                 onFocus={() => setShowPartySuggestions(true)}
                 onChange={(e) => {
@@ -867,47 +970,113 @@ export default function MaterialIssueForm() {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedMaterials.map((item, index) => (
-                    <tr key={item.name}>
-                      <td className="itemIndexCol">{index + 1}</td>
-                      <td className="itemDescCol">
-                        <div className="itemNameText">{item.name}</div>
-                        <div className="itemMetaRow">
-                          <span>Standard Issue Item</span>
-                        </div>
+                  {selectedMaterials.map((item, index) => {
+                    const stockAvail = getStockForItem(item.name);
+                    const qtyNum = Number(item.qty) || 0;
+                    const shortage = Math.max(0, qtyNum - stockAvail);
+
+                    return (
+                      <tr key={item.name}>
+                        <td className="itemIndexCol">{index + 1}</td>
+                        <td className="itemDescCol">
+                          <div className="itemNameText">{item.name}</div>
+                          <div className="itemMetaRow" style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "11px", color: stockAvail > 0 ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
+                              Warehouse Stock: {stockAvail} {item.unit}
+                            </span>
+                            {shortage > 0 && (
+                              <span style={{
+                                fontSize: "11px",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                background: "#fee2e2",
+                                color: "#dc2626",
+                                fontWeight: 700
+                              }}>
+                                ⚠️ Shortage: {shortage} {item.unit}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="categoryTag">{item.category}</span>
+                        </td>
+                        <td className="qtyCol">
+                          <div className="qtyControlGroup">
+                            <button
+                              type="button"
+                              className="qtyStepperBtn"
+                              onClick={() => handleStepQty(item.name, -1)}
+                              title="Decrease quantity"
+                            >
+                              −
+                            </button>
+                            <input
+                              ref={(el) => (qtyInputRefs.current[item.name] = el)}
+                              type="number"
+                              className="qtyInput"
+                              min="1"
+                              value={item.qty}
+                              onChange={(e) => handleQtyChange(item.name, e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="qtyStepperBtn"
+                              onClick={() => handleStepQty(item.name, 1)}
+                              title="Increase quantity"
+                            >
+                              +
+                            </button>
+                          </div>
+                          {shortage > 0 && stockAvail > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleQtyChange(item.name, stockAvail)}
+                              style={{
+                                marginTop: "4px",
+                                fontSize: "10px",
+                                padding: "2px 6px",
+                                background: "#eff6ff",
+                                color: "#1d4ed8",
+                                border: "1px solid #bfdbfe",
+                                borderRadius: "4px",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                display: "block",
+                                width: "100%",
+                                textAlign: "center"
+                              }}
+                              title="Set quantity to maximum available stock in warehouse"
+                            >
+                              ⚡ Issue Available ({stockAvail})
+                            </button>
+                          )}
+                        </td>
+                      <td className="unitCol">
+                        <select
+                          value={item.unit === "Meter" ? "Meter" : "Pcs"}
+                          onChange={(e) => {
+                            const newUnit = e.target.value;
+                            setSelectedMaterials((prev) =>
+                              prev.map((m) =>
+                                m.name === item.name ? { ...m, unit: newUnit } : m
+                              )
+                            );
+                          }}
+                          style={{
+                            padding: "3px 6px",
+                            borderRadius: "6px",
+                            border: "1px solid var(--border-default)",
+                            background: "var(--surface-card, #fff)",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <option value="Pcs">Pcs</option>
+                          <option value="Meter">Meter</option>
+                        </select>
                       </td>
-                      <td>
-                        <span className="categoryTag">{item.category}</span>
-                      </td>
-                      <td className="qtyCol">
-                        <div className="qtyControlGroup">
-                          <button
-                            type="button"
-                            className="qtyStepperBtn"
-                            onClick={() => handleStepQty(item.name, -1)}
-                            title="Decrease quantity"
-                          >
-                            −
-                          </button>
-                          <input
-                            ref={(el) => (qtyInputRefs.current[item.name] = el)}
-                            type="number"
-                            className="qtyInput"
-                            min="1"
-                            value={item.qty}
-                            onChange={(e) => handleQtyChange(item.name, e.target.value)}
-                          />
-                          <button
-                            type="button"
-                            className="qtyStepperBtn"
-                            onClick={() => handleStepQty(item.name, 1)}
-                            title="Increase quantity"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </td>
-                      <td className="unitCol">{item.unit}</td>
                       <td className="actionCol">
                         <button
                           type="button"
@@ -918,8 +1087,9 @@ export default function MaterialIssueForm() {
                           ✕
                         </button>
                       </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
 

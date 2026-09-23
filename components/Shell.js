@@ -25,7 +25,6 @@ const adminNavigationSections = [
       { href: "/vendors", label: "Vendors & Sites", icon: "👷" },
       { href: "/party-ledger", label: "Party Ledger", icon: "⚖" },
       { href: "/products", label: "Products Catalog", icon: "▦" },
-      { href: "/upload", label: "Upload Vault", icon: "⇧" },
       { href: "/reports", label: "Reports & Sync", icon: "▤" },
     ],
   },

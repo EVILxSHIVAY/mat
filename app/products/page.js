@@ -3,8 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
-import { Badge } from "@/components/ui/Badge";
-import DetailDrawer from "@/components/ui/DetailDrawer";
 import { exportToExcel } from "@/lib/exportToExcel";
 import {
   calculateLiveInventory,
@@ -14,7 +12,6 @@ import {
   inferUnit,
 } from "@/lib/dataService";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
-import StockAdjustModal from "@/components/inventory/StockAdjustModal";
 import "@/components/ui/ui.css";
 
 const CATEGORIES = [
@@ -27,32 +24,43 @@ const CATEGORIES = [
   "General Materials",
 ];
 
+function getSupplierName(p) {
+  if (p.companies && Array.isArray(p.companies) && p.companies.length > 0) {
+    const names = p.companies.map((c) => c.name).filter(Boolean);
+    if (names.length > 0) return names.join(", ");
+  }
+  return p.company || p.supplier || "—";
+}
+
 export default function ProductsPage() {
   const [productsList, setProductsList] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
-  const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // Stock Adjustment Modal
-  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
-  const [adjustingProduct, setAdjustingProduct] = useState(null);
-
-  // Add / Edit Modal
+  // Add Product Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     code: "",
     name: "",
     category: "Pipes & Fittings",
-    unit: "Pcs",
-    reorderLevel: 20,
-    rate: 150,
-    location: "Central Warehouse",
     supplier: "",
-    status: "Active",
   });
 
-  useEffect(() => {
+  const loadData = () => {
     setProductsList(calculateLiveInventory());
+    const sups = getStorageData(STORAGE_KEYS.SUPPLIERS, []);
+    setSuppliers(sups);
+  };
+
+  useEffect(() => {
+    loadData();
+    window.addEventListener("pdv_stock_updated", loadData);
+    window.addEventListener("pdv_suppliers_updated", loadData);
+    return () => {
+      window.removeEventListener("pdv_stock_updated", loadData);
+      window.removeEventListener("pdv_suppliers_updated", loadData);
+    };
   }, []);
 
   const handleOpenAdd = () => {
@@ -60,12 +68,7 @@ export default function ProductsPage() {
       code: `PRD-${String(productsList.length + 1).padStart(3, "0")}`,
       name: "",
       category: "Pipes & Fittings",
-      unit: "Pcs",
-      reorderLevel: 20,
-      rate: 150,
-      location: "Central Warehouse",
       supplier: "",
-      status: "Active",
     });
     setIsModalOpen(true);
   };
@@ -81,8 +84,8 @@ export default function ProductsPage() {
 
   const handleSaveProduct = (e) => {
     e.preventDefault();
-    if (!formData.name) {
-      alert("Material Description is required.");
+    if (!formData.name.trim()) {
+      alert("Material Name is required.");
       return;
     }
 
@@ -90,24 +93,24 @@ export default function ProductsPage() {
 
     const row = [
       formData.code,
-      formData.name,
+      formData.name.trim(),
       "",
       formData.category,
       validatedUnit,
-      formData.supplier,
-      formData.rate,
+      formData.supplier.trim(),
+      100,
       "18%",
       "",
       "",
-      formData.reorderLevel,
-      formData.location,
+      20,
+      "Central Warehouse",
       "",
-      formData.status,
+      "Active",
     ];
 
     const currentCustom = getStorageData(STORAGE_KEYS.PRODUCTS, []);
     setStorageData(STORAGE_KEYS.PRODUCTS, [row, ...currentCustom]);
-    setProductsList(calculateLiveInventory());
+    loadData();
     setIsModalOpen(false);
   };
 
@@ -115,11 +118,10 @@ export default function ProductsPage() {
     return productsList.filter((p) => {
       const name = (p.name || "").toLowerCase();
       const cat = (p.category || "").toLowerCase();
-      const loc = (p.location || "").toLowerCase();
+      const sup = getSupplierName(p).toLowerCase();
       const s = search.toLowerCase().trim();
 
-      const matchesSearch = !s || name.includes(s) || cat.includes(s) || loc.includes(s);
-
+      const matchesSearch = !s || name.includes(s) || cat.includes(s) || sup.includes(s);
       const matchesCat =
         categoryFilter === "All Categories" || p.category === categoryFilter;
 
@@ -128,84 +130,79 @@ export default function ProductsPage() {
   }, [productsList, search, categoryFilter]);
 
   const handleExport = () => {
-    const headers = [
-      "Material Name",
-      "Category",
-      "Unit",
-      "Available Stock",
-      "Rate (₹)",
-      "Location",
-      "Status",
-    ];
+    const headers = ["Material Name", "Category", "Supplier Name"];
     const rows = filteredProducts.map((p) => [
       p.name,
       p.category,
-      p.unit,
-      p.availableStock,
-      p.rate,
-      p.location,
-      p.status,
+      getSupplierName(p),
     ]);
-    exportToExcel({ filename: "Product_Master_Catalog", headers, rows });
+    exportToExcel({ filename: "Product_Catalog", headers, rows });
   };
-
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   return (
     <Shell>
       <Title
-        title="Product Master Data"
-        desc="Centralized specifications, standard rates, stock thresholds, and material catalog."
+        title="Products Catalog"
+        desc="Master catalog displaying Material Name, Category, and Supplier Name."
         action={
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", width: "100%" }}>
-            <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={handleExport}>
-              ⤓ Export
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ flex: 1, whiteSpace: "nowrap" }}
+              onClick={handleExport}
+            >
+              ⤓ Export Catalog
             </button>
             <button
               type="button"
-              className="btn-secondary"
+              className="btn btn-primary"
               style={{ flex: 1, whiteSpace: "nowrap" }}
-              onClick={() => {
-                setAdjustingProduct(null);
-                setIsAdjustModalOpen(true);
-              }}
+              onClick={handleOpenAdd}
             >
-              + Add Quantity
-            </button>
-            <button type="button" className="btn-primary" style={{ flex: 1 }} onClick={handleOpenAdd}>
               + Add Product
             </button>
           </div>
         }
       />
 
-      {/* Table & Mobile Card Card */}
+      {/* Table & Mobile Card Section */}
       <section className="card tableCard">
         <div className="tableControls">
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", width: "100%" }}>
-            <div className="invSearchBox">
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", width: "100%", flexWrap: "wrap" }}>
+            <div className="invSearchBox" style={{ flex: "1 1 260px", minWidth: 0 }}>
               <span>🔍</span>
               <input
                 type="text"
-                placeholder="Search material or category..."
+                placeholder="Search material, category, or supplier..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
               {search && (
-                <button type="button" className="clearBtn" onClick={() => setSearch("")}>
+                <button
+                  type="button"
+                  className="clearBtn"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                >
                   ×
                 </button>
               )}
             </div>
 
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ minHeight: "42px", padding: "0 12px", whiteSpace: "nowrap" }}
-              onClick={() => setIsFilterOpen(true)}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="invSelect"
+              style={{ minWidth: "160px", height: "42px" }}
+              aria-label="Filter by category"
             >
-              Filter ▾ {categoryFilter !== "All Categories" ? `(1)` : ""}
-            </button>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
 
           <span className="tableCountHint">
@@ -213,7 +210,7 @@ export default function ProductsPage() {
           </span>
         </div>
 
-        {/* 1. Mobile-First Compact Data Cards (Zero Horizontal Scroll on <= 768px) */}
+        {/* 1. Mobile-First Data Cards (Showing Material Name, Category, Supplier Name only) */}
         <div className="mobileCardList">
           {filteredProducts.length === 0 ? (
             <div className="emptyTable">
@@ -231,313 +228,109 @@ export default function ProductsPage() {
               </button>
             </div>
           ) : (
-            filteredProducts.map((p) => (
-              <div
-                key={p.code}
-                className="mobileDataCard"
-                onClick={() => setSelectedProduct(p)}
-              >
-                <div className="mobileCardHeader">
-                  <div className="mobileCardTitleArea">
-                    <div style={{ marginBottom: "4px" }}>
-                      <span className="categoryTag" style={{ fontSize: "11px" }}>{p.category}</span>
-                    </div>
-                    <h3 className="mobileCardTitle">{p.name}</h3>
+            filteredProducts.map((p) => {
+              const supplierName = getSupplierName(p);
+              return (
+                <div
+                  key={p.code || p.name}
+                  className="mobileDataCard"
+                  style={{ cursor: "default", padding: "14px 16px", gap: "8px" }}
+                >
+                  <div className="mobileCardHeader" style={{ alignItems: "center", marginBottom: "2px" }}>
+                    <h3 className="mobileCardTitle" style={{ fontSize: "14.5px", margin: 0, fontWeight: 700 }}>
+                      {p.name}
+                    </h3>
+                    <span className="categoryBadgePill" style={{ fontSize: "11px", flexShrink: 0 }}>
+                      {p.category}
+                    </span>
                   </div>
-                  <Badge>{p.status}</Badge>
-                </div>
-
-                <div className="mobileCardBody">
-                  <div className="mobileMetricItem">
-                    <span className="mobileMetricLabel">Available Stock</span>
-                    <strong className="mobileMetricVal highlight">
-                      {p.availableStock} {p.unit}
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--text-secondary)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <span style={{ color: "var(--text-muted)", fontSize: "12px", fontWeight: 600 }}>
+                      Supplier:
+                    </span>
+                    <strong
+                      style={{
+                        color: supplierName !== "—" ? "var(--text-primary)" : "var(--text-muted)",
+                      }}
+                    >
+                      {supplierName !== "—" && "🏢 "}
+                      {supplierName}
                     </strong>
                   </div>
-                  <div className="mobileMetricItem">
-                    <span className="mobileMetricLabel">Std Rate</span>
-                    <strong className="mobileMetricVal">₹ {p.rate}</strong>
-                  </div>
                 </div>
-
-                <div className="mobileCardFooter">
-                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                    📍 {p.location}
-                  </span>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <button
-                      type="button"
-                      className="actionBtn edit"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAdjustingProduct(p);
-                        setIsAdjustModalOpen(true);
-                      }}
-                    >
-                      + Add Qty
-                    </button>
-                    <button
-                      type="button"
-                      className="actionBtn view"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedProduct(p);
-                      }}
-                    >
-                      Inspect Specs →
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
-        {/* 2. Desktop Data Table (Gracefully visible on > 768px) */}
+        {/* 2. Desktop Data Table (Showing Material Name, Category, Supplier Name only) */}
         <div className="tableScroll">
           <table>
             <thead>
               <tr>
-                <th>Material Description</th>
-                <th>Category</th>
-                <th>Unit</th>
-                <th>Available Stock</th>
-                <th>Std Rate (₹)</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th>Action</th>
+                <th style={{ width: "45%", padding: "12px 18px" }}>Material Name</th>
+                <th style={{ width: "25%", padding: "12px 18px" }}>Category</th>
+                <th style={{ width: "30%", padding: "12px 18px" }}>Supplier Name</th>
               </tr>
             </thead>
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="emptyTable">
-                    <p>No products match your search.</p>
+                  <td colSpan={3} className="emptyTable">
+                    <p>No products match your search or filter.</p>
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map((p) => (
-                  <tr key={p.name} onClick={() => setSelectedProduct(p)}>
-                    <td>
-                      <strong>{p.name}</strong>
-                    </td>
-                    <td>{p.category}</td>
-                    <td>{p.unit}</td>
-                    <td>
-                      <b>{p.availableStock}</b> {p.unit}
-                    </td>
-                    <td>₹ {p.rate}</td>
-                    <td>{p.location}</td>
-                    <td>
-                      <Badge>{p.status}</Badge>
-                    </td>
-                    <td>
-                      <div className="actionBtnGroup">
-                        <button
-                          type="button"
-                          className="actionBtn edit"
-                          title="Add quantity or edit price"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAdjustingProduct(p);
-                            setIsAdjustModalOpen(true);
+                filteredProducts.map((p) => {
+                  const supplierName = getSupplierName(p);
+                  return (
+                    <tr key={p.code || p.name}>
+                      <td style={{ padding: "14px 18px" }}>
+                        <strong style={{ fontSize: "13.5px", color: "var(--text-primary)" }}>
+                          {p.name}
+                        </strong>
+                      </td>
+                      <td style={{ padding: "14px 18px" }}>
+                        <span className="categoryBadgePill">{p.category}</span>
+                      </td>
+                      <td style={{ padding: "14px 18px" }}>
+                        <span
+                          style={{
+                            fontWeight: 500,
+                            color: supplierName !== "—" ? "var(--text-primary)" : "var(--text-muted)",
                           }}
                         >
-                          + Add Qty / Price
-                        </button>
-                        <button
-                          type="button"
-                          className="actionBtn view"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedProduct(p);
-                          }}
-                        >
-                          Inspect →
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {supplierName !== "—" && "🏢 "}
+                          {supplierName}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </section>
 
-      {/* Filter Bottom Sheet */}
-      <DetailDrawer
-        isOpen={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-        title="Filter Products"
-        subtitle="Narrow down catalog items by category and parameters"
-        footerActions={
-          <div style={{ display: "flex", gap: "8px", width: "100%" }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ flex: 1 }}
-              onClick={() => {
-                setCategoryFilter("All Categories");
-                setIsFilterOpen(false);
-              }}
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ flex: 1 }}
-              onClick={() => setIsFilterOpen(false)}
-            >
-              Apply Filter
-            </button>
-          </div>
-        }
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-            Category
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="invSelect"
-              style={{ width: "100%" }}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </DetailDrawer>
-
-      {/* Product Detail Drawer */}
-      <DetailDrawer
-        isOpen={Boolean(selectedProduct)}
-        onClose={() => setSelectedProduct(null)}
-        title={selectedProduct?.name || "Product History"}
-        subtitle={`Category: ${selectedProduct?.category} · Location: ${selectedProduct?.location}`}
-        badge={<Badge>{selectedProduct?.status}</Badge>}
-        footerActions={
-          <div style={{ display: "flex", gap: "8px", width: "100%" }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ flex: 1 }}
-              onClick={() => setSelectedProduct(null)}
-            >
-              Close
-            </button>
-          </div>
-        }
-      >
-        {selectedProduct && (
-          <div>
-            <div className="drawerMetricGrid">
-              <div className="drawerMetricCard">
-                <span className="drawerMetricLabel">Available Stock</span>
-                <strong className="drawerMetricVal" style={{ color: "var(--brand-600)" }}>
-                  {selectedProduct.availableStock} {selectedProduct.unit}
-                </strong>
-              </div>
-              <div className="drawerMetricCard">
-                <span className="drawerMetricLabel">Std Rate</span>
-                <strong className="drawerMetricVal">₹ {selectedProduct.rate}</strong>
-              </div>
-            </div>
-
-            <div style={{ marginTop: "12px" }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
-                onClick={() => {
-                  setAdjustingProduct(selectedProduct);
-                  setIsAdjustModalOpen(true);
-                }}
-              >
-                <span>➕</span> Add Quantity & Edit Price
-              </button>
-            </div>
-
-            <h4 className="drawerSectionTitle" style={{ marginTop: "16px" }}>Material Specifications & Rates</h4>
-            <div className="drawerKvList">
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Material Description:</span>
-                <span className="drawerKvVal">{selectedProduct.name}</span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Category:</span>
-                <span className="drawerKvVal">{selectedProduct.category}</span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Unit of Measure:</span>
-                <span className="drawerKvVal">{selectedProduct.unit}</span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Base Rate:</span>
-                <span className="drawerKvVal">₹ {selectedProduct.rate} per {selectedProduct.unit}</span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Applicable GST:</span>
-                <span className="drawerKvVal">18% (₹ {(selectedProduct.rate * 0.18).toFixed(2)})</span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Rate incl. GST:</span>
-                <span className="drawerKvVal" style={{ color: "var(--brand-700)" }}>
-                  ₹ {(selectedProduct.rate * 1.18).toFixed(2)}
-                </span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Storage Location:</span>
-                <span className="drawerKvVal">{selectedProduct.location || "Central Warehouse"}</span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Primary Supplier:</span>
-                <span className="drawerKvVal">{selectedProduct.supplier || "Approved Suppliers"}</span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Inventory Valuation:</span>
-                <span className="drawerKvVal" style={{ fontWeight: 800 }}>
-                  ₹ {(selectedProduct.availableStock * (selectedProduct.rate || 0)).toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            <h4 className="drawerSectionTitle" style={{ marginTop: "20px" }}>Stock Movement Summary</h4>
-            <div className="drawerKvList">
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Total Purchased (Inward):</span>
-                <span className="drawerKvVal" style={{ color: "var(--brand-600)" }}>
-                  +{selectedProduct.totalPurchased || selectedProduct.availableStock} {selectedProduct.unit}
-                </span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Dispatched to Sites:</span>
-                <span className="drawerKvVal" style={{ color: "var(--orange-text)" }}>
-                  -{selectedProduct.totalIssued || 0} {selectedProduct.unit}
-                </span>
-              </div>
-              <div className="drawerKvRow">
-                <span className="drawerKvLabel">Consumed at Sites:</span>
-                <span className="drawerKvVal" style={{ color: "var(--green-text)" }}>
-                  {selectedProduct.totalConsumed || 0} {selectedProduct.unit}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </DetailDrawer>
-
-      {/* Add Product Modal - Single Column Responsive Layout */}
+      {/* Add Product Modal */}
       {isModalOpen && (
         <div className="modalBackdrop" onClick={() => setIsModalOpen(false)}>
-          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modalContent"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "480px" }}
+          >
             <div className="modalHeader">
-              <h3>Add Material to Product Master</h3>
+              <h3>Add Product to Catalog</h3>
               <button
                 type="button"
                 className="modalCloseBtn"
@@ -547,36 +340,38 @@ export default function ProductsPage() {
               </button>
             </div>
             <form onSubmit={handleSaveProduct}>
-              <div className="modalBody" style={{ display: "flex", flexDirection: "column", gap: "14px", minHeight: 0 }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-                  Product Code *
+              <div
+                className="modalBody"
+                style={{ display: "flex", flexDirection: "column", gap: "14px" }}
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Material Name *
                   <input
                     type="text"
                     required
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  />
-                </label>
-
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-                  Material Description *
-                  <input
-                    type="text"
-                    required
+                    placeholder="e.g. Steel Pipe 2 inch"
                     value={formData.name}
-                    onChange={(e) => {
-                      const newName = e.target.value;
-                      const inferred = inferUnit(newName);
-                      setFormData({
-                        ...formData,
-                        name: newName,
-                        unit: inferred,
-                      });
-                    }}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </label>
 
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                  }}
+                >
                   Category *
                   <select
                     value={formData.category}
@@ -592,49 +387,28 @@ export default function ProductsPage() {
                   </select>
                 </label>
 
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-                  Unit of Measure (Pcs or Meter) *
-                  <select
-                    value={formData.unit === "Meter" ? "Meter" : "Pcs"}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    className="invSelect"
-                    style={{ width: "100%" }}
-                  >
-                    <option value="Pcs">Pcs</option>
-                    <option value="Meter">Meter</option>
-                  </select>
-                </label>
-
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-                  Standard Rate (₹)
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.rate}
-                    onChange={(e) => setFormData({ ...formData, rate: Number(e.target.value) })}
-                  />
-                </label>
-
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-                  Warehouse Storage Location
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Supplier Name
                   <input
                     type="text"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="e.g. Jindal Steel Ltd"
+                    list="suppliers-list"
+                    value={formData.supplier}
+                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
                   />
-                </label>
-
-                <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-                  Status
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="invSelect"
-                    style={{ width: "100%" }}
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
+                  <datalist id="suppliers-list">
+                    {suppliers.map((s, idx) => (
+                      <option key={idx} value={s.name || s.supplierName || s[0]} />
+                    ))}
+                  </datalist>
                 </label>
               </div>
 
@@ -655,24 +429,6 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
-
-      {/* Stock Adjustment Modal */}
-      <StockAdjustModal
-        isOpen={isAdjustModalOpen}
-        onClose={() => setIsAdjustModalOpen(false)}
-        products={productsList}
-        initialProduct={adjustingProduct}
-        onStockUpdated={() => {
-          const fresh = calculateLiveInventory();
-          setProductsList(fresh);
-          if (selectedProduct) {
-            const updated = fresh.find(
-              (p) => p.code === selectedProduct.code || p.name === selectedProduct.name
-            );
-            if (updated) setSelectedProduct(updated);
-          }
-        }}
-      />
     </Shell>
   );
 }

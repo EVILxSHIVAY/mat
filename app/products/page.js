@@ -12,6 +12,7 @@ import {
   getStorageData,
   setStorageData,
   STORAGE_KEYS,
+  inferUnit,
 } from "@/lib/dataService";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import StockAdjustModal from "@/components/inventory/StockAdjustModal";
@@ -88,7 +89,7 @@ export default function ProductsPage() {
       return;
     }
 
-    const validatedUnit = formData.unit === "Meter" ? "Meter" : (formData.name.toLowerCase().includes("pipe") ? "Meter" : "Pcs");
+    const validatedUnit = inferUnit(formData.name);
 
     const row = [
       formData.code,
@@ -568,7 +569,7 @@ export default function ProductsPage() {
                     value={formData.name}
                     onChange={(e) => {
                       const newName = e.target.value;
-                      const inferred = newName.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
+                      const inferred = inferUnit(newName);
                       setFormData({
                         ...formData,
                         name: newName,

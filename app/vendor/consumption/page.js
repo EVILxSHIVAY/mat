@@ -9,6 +9,7 @@ import {
   getStorageData,
   setStorageData,
   STORAGE_KEYS,
+  inferUnit,
 } from "@/lib/dataService";
 import "@/components/ui/ui.css";
 import "../vendor.css";
@@ -60,7 +61,7 @@ export default function VendorConsumptionPage() {
           const key = m.name.toLowerCase().trim();
           const cur = stockMap.get(key) || {
             name: m.name,
-            unit: (m.unit === "Meter" || m.name.toLowerCase().includes("pipe")) ? "Meter" : "Pcs",
+            unit: inferUnit(m.name),
             issued: 0,
             consumed: 0,
           };
@@ -79,7 +80,7 @@ export default function VendorConsumptionPage() {
       } else if (mat) {
         stockMap.set(mat, {
           name: c.materialName || c.name,
-          unit: (c.unit === "Meter" || mat.includes("pipe")) ? "Meter" : "Pcs",
+          unit: inferUnit(c.materialName || c.name),
           issued: 0,
           consumed: qty,
         });
@@ -99,7 +100,7 @@ export default function VendorConsumptionPage() {
       return;
     }
 
-    const validatedUnit = (newLog.unit === "Meter" || newLog.materialName.toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
+    const validatedUnit = inferUnit(newLog.materialName);
 
     const entry = {
       id: `CON-${Date.now().toString().slice(-4)}`,
@@ -303,7 +304,7 @@ export default function VendorConsumptionPage() {
                     value={newLog.materialName}
                     onChange={(e) => {
                       const selected = siteStock.find((s) => s.name === e.target.value);
-                      const inferred = (selected?.unit === "Meter" || e.target.value.toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
+                      const inferred = selected?.unit || inferUnit(e.target.value);
                       setNewLog({
                         ...newLog,
                         materialName: e.target.value,

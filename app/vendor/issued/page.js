@@ -6,7 +6,7 @@ import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";
 import DetailDrawer from "@/components/ui/DetailDrawer";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getStorageData, STORAGE_KEYS } from "@/lib/dataService";
+import { getStorageData, STORAGE_KEYS, inferUnit } from "@/lib/dataService";
 import "@/components/ui/ui.css";
 import "../vendor.css";
 
@@ -104,7 +104,7 @@ export default function VendorIssuedMaterialsPage() {
               <th style={{ width: "120px" }}>Challan / Voucher</th>
               <th>Dispatch Date</th>
               <th>Allocated Site / Recipient</th>
-              <th style={{ textAlign: "center" }}>Line Items</th>
+              <th style={{ textAlign: "center", minWidth: "90px" }}>Qty</th>
               <th>Materials Included</th>
               <th>Status</th>
               <th style={{ textAlign: "right" }}>Action</th>
@@ -123,7 +123,14 @@ export default function VendorIssuedMaterialsPage() {
               </tr>
             ) : (
               filteredIssues.map((iss, idx) => {
-                const materials = iss.materials || [];
+                const materials =
+                  (iss.materials && iss.materials.length > 0)
+                    ? iss.materials
+                    : (iss.items && iss.items.length > 0)
+                    ? iss.items
+                    : (iss.materialName
+                    ? [{ name: iss.materialName, quantity: iss.quantity || iss.qty || 1, unit: iss.unit }]
+                    : []);
                 return (
                   <tr
                     key={iss.number || idx}
@@ -144,18 +151,39 @@ export default function VendorIssuedMaterialsPage() {
                       </strong>
                     </td>
                     <td style={{ textAlign: "center" }}>
-                      <span className="siteTag">{materials.length || iss.itemsCount || 1} items</span>
+                      {materials.length === 0 ? (
+                        <span className="siteTag" style={{ fontWeight: 700, color: "var(--foreground)" }}>
+                          {iss.quantity || iss.qty || iss.itemsCount || 1}
+                        </span>
+                      ) : materials.length === 1 ? (
+                        <span className="siteTag" style={{ fontWeight: 700, color: "var(--foreground)" }}>
+                          {materials[0].quantity ?? materials[0].qty ?? 1} {materials[0].unit || inferUnit(materials[0].name)}
+                        </span>
+                      ) : (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "center" }}>
+                          {materials.slice(0, 2).map((m, mIdx) => (
+                            <span key={mIdx} className="siteTag" style={{ fontWeight: 700, color: "var(--foreground)" }}>
+                              {m.quantity ?? m.qty ?? 1} {m.unit || inferUnit(m.name)}
+                            </span>
+                          ))}
+                          {materials.length > 2 && (
+                            <span className="siteTag more">+{materials.length - 2} more</span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
                         {materials.length > 0 ? (
                           materials.slice(0, 2).map((m, mIdx) => (
                             <span key={mIdx} className="siteTag">
-                              {m.name} ({m.quantity} {m.unit})
+                              {m.name}
                             </span>
                           ))
                         ) : (
-                          <span style={{ fontSize: "12px", color: "var(--muted)" }}>General materials</span>
+                          <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                            {iss.materialName || iss.name || "General materials"}
+                          </span>
                         )}
                         {materials.length > 2 && (
                           <span className="siteTag more">+{materials.length - 2} more</span>
@@ -232,7 +260,7 @@ export default function VendorIssuedMaterialsPage() {
                             {m.name}
                           </strong>
                           <span style={{ display: "block", fontSize: "11.5px", color: "var(--muted)" }}>
-                            Category: {m.category || "General"}
+                            Category: {m.category || "General"}{m.company ? ` · 🏢 ${m.company}` : ""}
                           </span>
                         </div>
                         <div style={{ textAlign: "right" }}>

@@ -123,7 +123,7 @@ export default function ReportsPage() {
   const handlePurgeData = () => {
     if (
       confirm(
-        "Are you sure you want to delete all operational records (Suppliers, Vendors, Purchases, Issues, Consumptions, Bills, Requisitions, Payments, Returns)?\n\nInventory & Products Master will be completely PRESERVED."
+        "Are you sure you want to delete all operational records (Suppliers, Vendors, Purchases, Issues, Consumptions, Bills, Requisitions, Payments)?\n\nInventory & Products Master will be completely PRESERVED."
       )
     ) {
       purgeAllOperationalData(false);
@@ -213,21 +213,6 @@ export default function ReportsPage() {
           ]),
         }),
     },
-    {
-      id: "proc-suppliers",
-      category: "procurement",
-      categoryLabel: "Procurement",
-      title: "Suppliers Directory",
-      desc: "Active and approved suppliers with GSTIN and contact details.",
-      count: data.suppliers.length,
-      icon: "🏢",
-      onExport: () =>
-        exportToExcel({
-          filename: "Suppliers_Directory_Report",
-          headers: ["Code", "Name", "Contact Person", "Phone", "Email", "GSTIN", "Status"],
-          rows: data.suppliers,
-        }),
-    },
 
     // 3. OPERATIONS
     {
@@ -280,30 +265,6 @@ export default function ReportsPage() {
             n.requiredByDate,
             n.priority,
             n.status,
-          ]),
-        }),
-    },
-    {
-      id: "ops-returns",
-      category: "operations",
-      categoryLabel: "Operations",
-      title: "Returns & Movement Log",
-      desc: "Site returns to warehouse, inter-site transfers, and scrap records.",
-      count: data.returns.length,
-      icon: "⇄",
-      onExport: () =>
-        exportToExcel({
-          filename: "Returns_and_Transfers_Report",
-          headers: ["Voucher #", "Type", "Date", "Source", "Destination", "Material", "Qty", "Reason"],
-          rows: data.returns.map((r) => [
-            r.returnNo,
-            r.movementType,
-            r.date,
-            r.sourceSite,
-            r.destinationSite,
-            r.materialName,
-            `${r.quantity} ${r.unit}`,
-            r.reason,
           ]),
         }),
     },

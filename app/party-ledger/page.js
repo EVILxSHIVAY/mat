@@ -10,8 +10,8 @@ import {
   getStorageData,
   setStorageData,
   STORAGE_KEYS,
-  formatCurrency,
   getTodayDate,
+  inferUnit,
 } from "@/lib/dataService";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import "@/components/ui/ui.css";
@@ -27,36 +27,22 @@ const INITIAL_NEEDED = {
   remarks: "",
 };
 
-const INITIAL_PAYMENT = {
-  partyName: "",
-  invoiceNo: "",
-  invoiceDate: "",
-  totalAmount: "",
-  amountPaid: "",
-  paymentMode: "Bank Transfer (NEFT/RTGS)",
-  paymentDate: "",
-  status: "Pending",
-};
-
 export default function PartyLedgerPage() {
   // Data States
   const [suppliers, setSuppliers] = useState([]);
   const [issues, setIssues] = useState([]);
   const [consumptions, setConsumptions] = useState([]);
   const [neededList, setNeededList] = useState([]);
-  const [paymentsList, setPaymentsList] = useState([]);
   const [syncStatus, setSyncStatus] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Selection & Tab States
   const [selectedParty, setSelectedParty] = useState("All Parties");
-  const [activeTab, setActiveTab] = useState("needed"); // 'needed' | 'issued' | 'consumed' | 'payments'
+  const [activeTab, setActiveTab] = useState("needed"); // 'needed' | 'issued' | 'consumed'
 
   // Modal States
   const [isNeededModalOpen, setIsNeededModalOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [newNeeded, setNewNeeded] = useState(INITIAL_NEEDED);
-  const [newPayment, setNewPayment] = useState(INITIAL_PAYMENT);
 
   // Load datasets on mount
   useEffect(() => {
@@ -73,15 +59,6 @@ export default function PartyLedgerPage() {
     if (cleanNeeded.length !== rawNeeded.length) {
       setStorageData(STORAGE_KEYS.NEEDED, cleanNeeded, false);
     }
-
-    const rawPayments = getStorageData(STORAGE_KEYS.PAYMENTS, []);
-    const cleanPayments = rawPayments.filter(
-      (p) => p && p.partyName !== "Apex Supplies" && p.partyName !== "Vrindavan Site A"
-    );
-    setPaymentsList(cleanPayments);
-    if (cleanPayments.length !== rawPayments.length) {
-      setStorageData(STORAGE_KEYS.PAYMENTS, cleanPayments, false);
-    }
   }, []);
 
   useEffect(() => {
@@ -92,15 +69,6 @@ export default function PartyLedgerPage() {
       if (isNeededModalOpen) unlockScroll();
     };
   }, [isNeededModalOpen]);
-
-  useEffect(() => {
-    if (isPaymentModalOpen) {
-      lockScroll();
-    }
-    return () => {
-      if (isPaymentModalOpen) unlockScroll();
-    };
-  }, [isPaymentModalOpen]);
 
   // Sync to Google Sheets
   const syncNeededToSheets = async (list) => {
@@ -126,30 +94,6 @@ export default function PartyLedgerPage() {
     }
   };
 
-  const syncPaymentsToSheets = async (list) => {
-    if (!getWebhookUrl()) return;
-    try {
-      const rows = list.map((p) => [
-        p.partyName,
-        p.invoiceNo,
-        p.invoiceDate,
-        p.totalAmount,
-        p.amountPaid,
-        p.balanceLeft,
-        p.paymentMode,
-        p.paymentDate,
-        p.status,
-      ]);
-      await syncSingleToGoogleSheets({
-        sheetName: "Party_Payments",
-        headers: ["Party / Vendor", "Invoice #", "Invoice Date", "Total Billed (₹)", "Amount Paid / Received (₹)", "Balance Due (₹)", "Payment Mode", "Payment Date", "Status"],
-        rows,
-      });
-    } catch (e) {
-      console.warn("Could not sync payments list to sheets:", e);
-    }
-  };
-
   const handleSyncCurrentTabToSheets = async () => {
     if (!getWebhookUrl()) {
       alert("Please configure your Google Sheets Webhook URL first on the Reports page.");
@@ -159,8 +103,7 @@ export default function PartyLedgerPage() {
     setSyncStatus("Syncing to Google Sheets...");
     try {
       await syncNeededToSheets(neededList);
-      await syncPaymentsToSheets(paymentsList);
-      setSyncStatus("✓ Material Needed & Payment Ledger synced to Google Sheets!");
+      setSyncStatus("✓ Material Needed ledger synced to Google Sheets!");
     } catch (e) {
       setSyncStatus("Sync failed: " + e.message);
     } finally {
@@ -177,10 +120,9 @@ export default function PartyLedgerPage() {
         ...issues.map((i) => i.department || i.issuedTo),
         ...consumptions.map((c) => c.department || c.site),
         ...neededList.map((n) => n.partyName),
-        ...paymentsList.map((p) => p.partyName),
       ])
     ).filter(Boolean);
-  }, [suppliers, issues, consumptions, neededList, paymentsList]);
+  }, [suppliers, issues, consumptions, neededList]);
 
   // Filter datasets by selected party
   const filteredNeeded = useMemo(() => {
@@ -201,16 +143,30 @@ export default function PartyLedgerPage() {
       : consumptions.filter((c) => (c.department || c.site || "").toLowerCase().includes(selectedParty.toLowerCase()));
   }, [consumptions, selectedParty]);
 
-  const filteredPayments = useMemo(() => {
-    return selectedParty === "All Parties"
-      ? paymentsList
-      : paymentsList.filter((p) => (p.partyName || "").toLowerCase().includes(selectedParty.toLowerCase()));
-  }, [paymentsList, selectedParty]);
+  // Helper to determine required quantity for an issued material
+  const getRequiredQty = (issue, matName) => {
+    if (!issue) return null;
+    if (issue.requiredQty !== undefined && issue.requiredQty !== null) return issue.requiredQty;
+    if (issue.quantityNeeded !== undefined && issue.quantityNeeded !== null) return issue.quantityNeeded;
 
-  // Financial KPIs
-  const totalBilled = useMemo(() => filteredPayments.reduce((acc, p) => acc + (Number(p.totalAmount) || 0), 0), [filteredPayments]);
-  const totalReceived = useMemo(() => filteredPayments.reduce((acc, p) => acc + (Number(p.amountPaid) || 0), 0), [filteredPayments]);
-  const totalBalanceDue = Math.max(0, totalBilled - totalReceived);
+    if (issue.reqId) {
+      const matchById = neededList.find((n) => String(n.id) === String(issue.reqId));
+      if (matchById) return matchById.quantityNeeded || matchById.quantity;
+    }
+
+    const party = String(issue.department || issue.issuedTo || "").toLowerCase().trim();
+    const cleanMat = String(matName || "").toLowerCase().trim();
+    const matched = neededList.find((n) => {
+      const p = String(n.partyName || n.vendor || "").toLowerCase().trim();
+      const m = String(n.materialName || "").toLowerCase().trim();
+      const partyMatches = !party || p.includes(party) || party.includes(p);
+      const matMatches = cleanMat && (m === cleanMat || cleanMat.includes(m) || m.includes(cleanMat));
+      return partyMatches && matMatches;
+    });
+
+    if (matched) return matched.quantityNeeded || matched.quantity;
+    return null;
+  };
 
   // Save new material needed
   const handleSaveNeeded = (e) => {
@@ -240,51 +196,13 @@ export default function PartyLedgerPage() {
     setNewNeeded(INITIAL_NEEDED);
   };
 
-  // Save new payment record
-  const handleSavePayment = (e) => {
-    e.preventDefault();
-    const billed = Number(newPayment.totalAmount) || 0;
-    const paid = Number(newPayment.amountPaid) || 0;
-    const balance = Math.max(0, billed - paid);
-    const status = paid >= billed && billed > 0 ? "Paid" : paid > 0 ? "Partial" : "Pending";
-
-    const record = {
-      id: Date.now(),
-      partyName: newPayment.partyName || (selectedParty !== "All Parties" ? selectedParty : "Vendor"),
-      invoiceNo: newPayment.invoiceNo || `INV-${Date.now().toString().slice(-4)}`,
-      invoiceDate: newPayment.invoiceDate || new Date().toLocaleDateString("en-GB"),
-      totalAmount: billed,
-      amountPaid: paid,
-      balanceLeft: balance,
-      paymentMode: newPayment.paymentMode,
-      paymentDate: newPayment.paymentDate || new Date().toLocaleDateString("en-GB"),
-      status,
-    };
-
-    const updated = [record, ...paymentsList];
-    setPaymentsList(updated);
-    setStorageData(STORAGE_KEYS.PAYMENTS, updated);
-    syncPaymentsToSheets(updated);
-    setIsPaymentModalOpen(false);
-    setNewPayment(INITIAL_PAYMENT);
-  };
-
-  // Deletion handlers
+  // Deletion handler
   const handleDeleteNeeded = (id) => {
     if (confirm("Remove this requirement?")) {
       const updated = neededList.filter((n) => n.id !== id);
       setNeededList(updated);
       setStorageData(STORAGE_KEYS.NEEDED, updated);
       syncNeededToSheets(updated);
-    }
-  };
-
-  const handleDeletePayment = (id) => {
-    if (confirm("Delete this payment entry?")) {
-      const updated = paymentsList.filter((p) => p.id !== id);
-      setPaymentsList(updated);
-      setStorageData(STORAGE_KEYS.PAYMENTS, updated);
-      syncPaymentsToSheets(updated);
     }
   };
 
@@ -300,20 +218,38 @@ export default function PartyLedgerPage() {
     } else if (activeTab === "issued") {
       exportToExcel({
         filename,
-        headers: ["Challan #", "Date", "Department / Party", "Items Count", "Status"],
-        rows: filteredIssues.map((i) => [i.number || i.challanNo, i.date, i.department || i.issuedTo, i.itemsCount, i.status]),
-      });
-    } else if (activeTab === "consumed") {
-      exportToExcel({
-        filename,
-        headers: ["Consumption #", "Date", "Department / Party", "Items Count", "Status"],
-        rows: filteredConsumptions.map((c) => [c.number, c.date, c.department || c.site, c.itemsCount, c.status]),
+        headers: ["Challan #", "Date", "Issued To", "Material", "Issued Qty", "Required Qty", "Status"],
+        rows: filteredIssues.map((i) => {
+          const mats =
+            (i.materials && i.materials.length > 0)
+              ? i.materials
+              : (i.items && i.items.length > 0)
+              ? i.items
+              : (i.materialName
+              ? [{ name: i.materialName, quantity: i.quantity || i.qty || 1, unit: i.unit }]
+              : []);
+          const matNames = mats.map((m) => m.name).join(", ") || i.materialName || "General Materials";
+          const issuedQuantities = mats.map((m) => `${m.quantity ?? m.qty ?? 1} ${m.unit || inferUnit(m.name)}`).join(", ");
+          const reqQuantities = mats.map((m) => {
+            const req = getRequiredQty(i, m.name);
+            return req !== null && req !== undefined ? `${req} ${m.unit || inferUnit(m.name)}` : "—";
+          }).join(", ");
+          return [
+            i.number || i.challanNo,
+            i.date,
+            i.department || i.issuedTo,
+            matNames,
+            issuedQuantities,
+            reqQuantities,
+            i.status || "Issued",
+          ];
+        }),
       });
     } else {
       exportToExcel({
         filename,
-        headers: ["Party Name", "Invoice #", "Invoice Date", "Total Billed (₹)", "Amount Received (₹)", "Balance Left (₹)", "Payment Mode", "Status"],
-        rows: filteredPayments.map((p) => [p.partyName, p.invoiceNo, p.invoiceDate, p.totalAmount, p.amountPaid, p.balanceLeft, p.paymentMode, p.status]),
+        headers: ["Consumption #", "Date", "Department / Party", "Items Count", "Status"],
+        rows: filteredConsumptions.map((c) => [c.number, c.date, c.department || c.site, c.itemsCount, c.status]),
       });
     }
   };
@@ -322,6 +258,7 @@ export default function PartyLedgerPage() {
     <Shell>
       <Title
         title="Party Ledger"
+        desc="Material requirements, dispatch vouchers, and site consumptions by vendor or site."
         action={
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             <button
@@ -335,11 +272,8 @@ export default function PartyLedgerPage() {
             <button type="button" className="secondary" onClick={handleExportStatement}>
               Export CSV
             </button>
-            <button type="button" className="secondary" onClick={() => setIsNeededModalOpen(true)}>
+            <button type="button" className="primary" onClick={() => setIsNeededModalOpen(true)}>
               + Request Material
-            </button>
-            <button type="button" className="primary" onClick={() => setIsPaymentModalOpen(true)}>
-              + Record Payment
             </button>
           </div>
         }
@@ -351,7 +285,7 @@ export default function PartyLedgerPage() {
         </div>
       )}
 
-      {/* 1. Party Selector & Financial Summary Bar */}
+      {/* 1. Party Selector & Material Summary Bar */}
       <section className="card ledgerHeadCard">
         <div className="partySelectorRow">
           <div className="partySelector">
@@ -366,48 +300,31 @@ export default function PartyLedgerPage() {
 
           <div className="kpiGroup">
             <div className="kpiBox">
-              <span className="kpiLabel">Total Invoiced</span>
-              <strong className="kpiVal">{formatCurrency(totalBilled)}</strong>
+              <span className="kpiLabel">Material Requested</span>
+              <strong className="kpiVal">{filteredNeeded.reduce((a, n) => a + (Number(n.quantityNeeded) || 1), 0)} Units</strong>
             </div>
             <div className="kpiBox success">
-              <span className="kpiLabel">Amount Received</span>
-              <strong className="kpiVal">{formatCurrency(totalReceived)}</strong>
+              <span className="kpiLabel">Material Issued</span>
+              <strong className="kpiVal">{filteredIssues.reduce((a, i) => a + (Number(i.itemsCount) || 1), 0)} Items</strong>
             </div>
-            <div className="kpiBox danger">
-              <span className="kpiLabel">Balance Outstanding</span>
-              <strong className="kpiVal">{formatCurrency(totalBalanceDue)}</strong>
+            <div className="kpiBox">
+              <span className="kpiLabel">Material Consumed</span>
+              <strong className="kpiVal">{filteredConsumptions.reduce((a, c) => a + (Number(c.itemsCount) || 1), 0)} Items</strong>
             </div>
-          </div>
-        </div>
-
-        {/* Material Summary Position */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "8px", marginTop: "14px", paddingTop: "12px", borderTop: "1px solid var(--border-default)" }}>
-          <div className="kpiBox">
-            <span className="kpiLabel">Material Requested</span>
-            <strong className="kpiVal">{filteredNeeded.reduce((a, n) => a + (Number(n.quantityNeeded) || 1), 0)} Units</strong>
-          </div>
-          <div className="kpiBox">
-            <span className="kpiLabel">Material Issued</span>
-            <strong className="kpiVal">{filteredIssues.reduce((a, i) => a + (Number(i.itemsCount) || 1), 0)} Items</strong>
-          </div>
-          <div className="kpiBox">
-            <span className="kpiLabel">Material Consumed</span>
-            <strong className="kpiVal">{filteredConsumptions.reduce((a, c) => a + (Number(c.itemsCount) || 1), 0)} Items</strong>
-          </div>
-          <div className="kpiBox" style={{ background: "var(--brand-50)", borderColor: "var(--brand-200)" }}>
-            <span className="kpiLabel">Active Requisitions</span>
-            <strong className="kpiVal" style={{ color: "var(--brand-700)" }}>{filteredNeeded.length} Pending</strong>
+            <div className="kpiBox" style={{ background: "var(--brand-50)", borderColor: "var(--brand-200)" }}>
+              <span className="kpiLabel">Active Requisitions</span>
+              <strong className="kpiVal" style={{ color: "var(--brand-700)" }}>{filteredNeeded.length} Pending</strong>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 2. 4-Tab Navigation */}
+      {/* 2. 3-Tab Navigation */}
       <div className="ledgerTabs">
         {[
           { id: "needed", label: `Material Needed (${filteredNeeded.length})` },
           { id: "issued", label: `Material Issued (${filteredIssues.length})` },
           { id: "consumed", label: `Material Consumed (${filteredConsumptions.length})` },
-          { id: "payments", label: `Payment Ledger (${filteredPayments.length})` },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -528,28 +445,107 @@ export default function PartyLedgerPage() {
                   <tr>
                     <th>Challan / Sl #</th>
                     <th>Date</th>
-                    <th>Issued To / Site</th>
-                    <th>Items Dispatched</th>
+                    <th>Issued To</th>
+                    <th>Material</th>
+                    <th style={{ minWidth: "150px" }}>Issued / Required Qty</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredIssues.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="emptyTable">
+                      <td colSpan={6} className="emptyTable">
                         <p>No material issue records found for {selectedParty}.</p>
                       </td>
                     </tr>
                   ) : (
-                    filteredIssues.map((i, idx) => (
-                      <tr key={idx}>
-                        <td><strong>{i.number || i.challanNo}</strong></td>
-                        <td>{i.date}</td>
-                        <td>{i.department || i.issuedTo}</td>
-                        <td>{i.itemsCount || (i.items ? i.items.length : 1)} items</td>
-                        <td><Badge>{i.status || "Issued"}</Badge></td>
-                      </tr>
-                    ))
+                    filteredIssues.map((i, idx) => {
+                      const materials =
+                        (i.materials && i.materials.length > 0)
+                          ? i.materials
+                          : (i.items && i.items.length > 0)
+                          ? i.items
+                          : (i.materialName
+                          ? [{ name: i.materialName, quantity: i.quantity || i.qty || 1, unit: i.unit }]
+                          : []);
+
+                      return (
+                        <tr key={idx}>
+                          <td><strong>{i.number || i.challanNo}</strong></td>
+                          <td>{i.date}</td>
+                          <td>
+                            <strong>{i.department || i.issuedTo || selectedParty}</strong>
+                          </td>
+                          <td>
+                            {materials.length === 0 ? (
+                              <span style={{ color: "var(--muted)", fontSize: "13px" }}>
+                                {i.materialName || i.name || "General Materials"}
+                              </span>
+                            ) : materials.length === 1 ? (
+                              <strong style={{ color: "var(--foreground)", fontSize: "13px" }}>
+                                {materials[0].name}
+                              </strong>
+                            ) : (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                {materials.map((m, mIdx) => (
+                                  <span key={mIdx} style={{ fontSize: "13px", fontWeight: 600, color: "var(--foreground)" }}>
+                                    {m.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {materials.length === 0 ? (
+                              <strong style={{ color: "#059669", fontSize: "13px" }}>
+                                {i.quantity || i.qty || i.itemsCount || 1} {i.unit || "Pcs"}
+                              </strong>
+                            ) : (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                {materials.map((m, mIdx) => {
+                                  const issuedQty = m.quantity ?? m.qty ?? 1;
+                                  const unit = m.unit || inferUnit(m.name);
+                                  const reqQty = getRequiredQty(i, m.name);
+                                  const isFull = reqQty !== null && reqQty !== undefined && Number(issuedQty) >= Number(reqQty);
+
+                                  return (
+                                    <div key={mIdx} style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                        <strong style={{ color: "#059669", fontSize: "13.5px" }}>
+                                          {issuedQty} {unit}
+                                        </strong>
+                                        {reqQty !== null && reqQty !== undefined && (
+                                          <span
+                                            style={{
+                                              fontSize: "10px",
+                                              fontWeight: 700,
+                                              padding: "1px 6px",
+                                              borderRadius: "10px",
+                                              background: isFull ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.14)",
+                                              color: isFull ? "#059669" : "#d97706",
+                                              border: `1px solid ${isFull ? "rgba(16, 185, 129, 0.25)" : "rgba(245, 158, 11, 0.3)"}`,
+                                            }}
+                                          >
+                                            {isFull ? "Full" : "Partial"}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {reqQty !== null && reqQty !== undefined && (
+                                        <div style={{ fontSize: "11.5px", color: "var(--muted)", display: "flex", alignItems: "center", gap: "3px" }}>
+                                          <span>Required:</span>
+                                          <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{reqQty} {unit}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </td>
+                          <td><Badge>{i.status || "Issued"}</Badge></td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -562,27 +558,64 @@ export default function PartyLedgerPage() {
                   <p>No material issue records found.</p>
                 </div>
               ) : (
-                filteredIssues.map((i, idx) => (
-                  <div key={idx} className="mobileDataCard">
-                    <div className="mobileCardHeader">
-                      <div className="mobileCardTitleArea">
-                        <code className="codeBadge">{i.number || i.challanNo}</code>
-                        <h3 className="mobileCardTitle" style={{ marginTop: "4px" }}>{i.department || i.issuedTo}</h3>
+                filteredIssues.map((i, idx) => {
+                  const materials =
+                    (i.materials && i.materials.length > 0)
+                      ? i.materials
+                      : (i.items && i.items.length > 0)
+                      ? i.items
+                      : (i.materialName
+                      ? [{ name: i.materialName, quantity: i.quantity || i.qty || 1, unit: i.unit }]
+                      : []);
+
+                  return (
+                    <div key={idx} className="mobileDataCard">
+                      <div className="mobileCardHeader">
+                        <div className="mobileCardTitleArea">
+                          <code className="codeBadge">{i.number || i.challanNo}</code>
+                          <h3 className="mobileCardTitle" style={{ marginTop: "4px" }}>
+                            {i.department || i.issuedTo || selectedParty}
+                          </h3>
+                        </div>
+                        <Badge>{i.status || "Issued"}</Badge>
                       </div>
-                      <Badge>{i.status || "Issued"}</Badge>
+                      <div className="mobileCardBody">
+                        <div className="mobileMetricItem">
+                          <span className="mobileMetricLabel">Material</span>
+                          <strong className="mobileMetricVal">
+                            {materials.map((m) => m.name).join(", ") || i.materialName || "General Materials"}
+                          </strong>
+                        </div>
+                        <div className="mobileMetricItem">
+                          <span className="mobileMetricLabel">Issued / Req. Qty</span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                            {materials.map((m, mIdx) => {
+                              const issuedQty = m.quantity ?? m.qty ?? 1;
+                              const unit = m.unit || inferUnit(m.name);
+                              const reqQty = getRequiredQty(i, m.name);
+                              return (
+                                <div key={mIdx}>
+                                  <strong className="mobileMetricVal highlight" style={{ color: "#059669" }}>
+                                    {issuedQty} {unit}
+                                  </strong>
+                                  {reqQty !== null && reqQty !== undefined && (
+                                    <span style={{ fontSize: "11px", color: "var(--muted)", marginLeft: "4px" }}>
+                                      (Req: {reqQty} {unit})
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="mobileMetricItem">
+                          <span className="mobileMetricLabel">Issue Date</span>
+                          <span className="mobileMetricVal" style={{ fontSize: "13.5px" }}>{i.date}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="mobileCardBody">
-                      <div className="mobileMetricItem">
-                        <span className="mobileMetricLabel">Dispatched</span>
-                        <strong className="mobileMetricVal highlight">{i.itemsCount || (i.items ? i.items.length : 1)} items</strong>
-                      </div>
-                      <div className="mobileMetricItem">
-                        <span className="mobileMetricLabel">Issue Date</span>
-                        <span className="mobileMetricVal" style={{ fontSize: "13.5px" }}>{i.date}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </>
@@ -656,144 +689,6 @@ export default function PartyLedgerPage() {
             </div>
           </>
         )}
-
-        {/* Tab 4: Payment Status & Ledger */}
-        {activeTab === "payments" && (
-          <>
-            <div className="tableScroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Party / Vendor</th>
-                    <th>Invoice #</th>
-                    <th>Date</th>
-                    <th>Total Billed</th>
-                    <th>Amount Received / Paid</th>
-                    <th>Balance Left</th>
-                    <th>Payment Mode</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPayments.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="emptyTable">
-                        <p>No payment or billing entries recorded for {selectedParty}.</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredPayments.map((p) => (
-                      <tr key={p.id}>
-                        <td><strong>{p.partyName}</strong></td>
-                        <td>{p.invoiceNo}</td>
-                        <td>{p.invoiceDate}</td>
-                        <td><b>{formatCurrency(p.totalAmount)}</b></td>
-                        <td style={{ color: "var(--green-text)", fontWeight: "700" }}>{formatCurrency(p.amountPaid)}</td>
-                        <td style={{ color: p.balanceLeft > 0 ? "var(--red-text)" : "var(--text-secondary)", fontWeight: "700" }}>
-                          {formatCurrency(p.balanceLeft)}
-                        </td>
-                        <td>{p.paymentMode}</td>
-                        <td><Badge>{p.status}</Badge></td>
-                        <td>
-                          <button type="button" className="actionBtn delete" onClick={() => handleDeletePayment(p.id)}>
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile View */}
-            <div className="mobileCardList">
-              {filteredPayments.length === 0 ? (
-                <div className="emptyTable">
-                  <p>No payment entries recorded.</p>
-                </div>
-              ) : (
-                filteredPayments.map((p) => {
-                  const isDue = Number(p.balanceLeft) > 0;
-
-                  return (
-                    <div key={p.id} className="mobileDataCard ledgerPaymentCard">
-                      <div className="mobileCardHeader">
-                        <div className="mobileCardTitleArea">
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                            <code className="codeBadge">{p.invoiceNo || "INV-GEN"}</code>
-                            <span className="paymentModeBadge">{p.paymentMode || "NEFT"}</span>
-                          </div>
-                          <h3 className="mobileCardTitle">{p.partyName}</h3>
-                        </div>
-                        <Badge>{p.status}</Badge>
-                      </div>
-
-                      {/* Primary Financial Metric Strip */}
-                      <div className="ledgerFinancialStrip">
-                        <div className="ledgerBalanceCol">
-                          <span className="ledgerBalanceLabel">Balance Due</span>
-                          <strong className={`ledgerBalanceVal ${isDue ? "due" : "settled"}`}>
-                            {isDue ? formatCurrency(p.balanceLeft) : "✓ Cleared"}
-                          </strong>
-                        </div>
-                        <div className="ledgerPaidCol">
-                          <span className="ledgerBalanceLabel">Amount Paid</span>
-                          <strong className="ledgerPaidVal">
-                            {formatCurrency(p.amountPaid)}
-                          </strong>
-                        </div>
-                      </div>
-
-                      {/* Tap-to-Expand Transaction Details */}
-                      <details className="ledgerExpandable">
-                        <summary className="ledgerExpandSummary">
-                          <span>📋 Billing & Date Details</span>
-                          <span className="expandChevron">▾</span>
-                        </summary>
-                        <div className="ledgerExpandContent">
-                          <div className="ledgerDetailRow">
-                            <span className="detailLabel">Total Invoice Amount:</span>
-                            <span className="detailVal"><b>{formatCurrency(p.totalAmount)}</b></span>
-                          </div>
-                          <div className="ledgerDetailRow">
-                            <span className="detailLabel">Invoice Date:</span>
-                            <span className="detailVal">{p.invoiceDate || "—"}</span>
-                          </div>
-                          <div className="ledgerDetailRow">
-                            <span className="detailLabel">Settlement Mode:</span>
-                            <span className="detailVal">{p.paymentMode || "Standard Bank Transfer"}</span>
-                          </div>
-                          {p.remarks && (
-                            <div className="ledgerDetailRow">
-                              <span className="detailLabel">Remarks / Ref:</span>
-                              <span className="detailVal">{p.remarks}</span>
-                            </div>
-                          )}
-                        </div>
-                      </details>
-
-                      <div className="mobileCardFooter">
-                        <span style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
-                          {p.invoiceDate ? `Issued: ${p.invoiceDate}` : "Active ledger entry"}
-                        </span>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-danger ledgerDeleteBtn"
-                          onClick={() => handleDeletePayment(p.id)}
-                          aria-label="Delete entry"
-                        >
-                          ✕ Delete
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </>
-        )}
       </section>
 
       {/* MODAL 1: Request Material (Material Needed) */}
@@ -824,7 +719,7 @@ export default function PartyLedgerPage() {
                     value={newNeeded.materialName}
                     onChange={(e) => {
                       const val = e.target.value;
-                      const inferred = val.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
+                      const inferred = inferUnit(val);
                       setNewNeeded({ ...newNeeded, materialName: val, unit: inferred });
                     }}
                   />
@@ -880,92 +775,6 @@ export default function PartyLedgerPage() {
               <div className="modalFooter">
                 <button type="button" className="secondary" onClick={() => setIsNeededModalOpen(false)}>Cancel</button>
                 <button type="submit" className="primary">Save Requirement</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: Record Payment */}
-      {isPaymentModalOpen && (
-        <div className="modalBackdrop" onClick={() => setIsPaymentModalOpen(false)}>
-          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
-            <div className="modalHeader">
-              <h3>Record Payment</h3>
-              <button type="button" className="modalCloseBtn" onClick={() => setIsPaymentModalOpen(false)}>✕</button>
-            </div>
-            <form onSubmit={handleSavePayment}>
-              <div className="modalBody formGrid">
-                <div>
-                  <label>Party / Supplier / Customer *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newPayment.partyName}
-                    onChange={(e) => setNewPayment({ ...newPayment, partyName: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label>Invoice / Bill Number *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newPayment.invoiceNo}
-                    onChange={(e) => setNewPayment({ ...newPayment, invoiceNo: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label>Total Invoiced / Bill Amount (₹) *</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={newPayment.totalAmount}
-                    onChange={(e) => setNewPayment({ ...newPayment, totalAmount: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label>Amount Received / Paid (₹) *</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={newPayment.amountPaid}
-                    onChange={(e) => setNewPayment({ ...newPayment, amountPaid: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label>Payment Mode</label>
-                  <select
-                    value={newPayment.paymentMode}
-                    onChange={(e) => setNewPayment({ ...newPayment, paymentMode: e.target.value })}
-                  >
-                    <option value="Bank Transfer (NEFT/RTGS)">Bank Transfer (NEFT/RTGS)</option>
-                    <option value="UPI / QR">UPI / QR</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Cash">Cash</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label>Payment Date</label>
-                  <input
-                    type="date"
-                    value={newPayment.paymentDate}
-                    onChange={(e) => setNewPayment({ ...newPayment, paymentDate: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="modalFooter">
-                <button type="button" className="secondary" onClick={() => setIsPaymentModalOpen(false)}>Cancel</button>
-                <button type="submit" className="primary">
-                  Save Payment Record
-                </button>
               </div>
             </form>
           </div>

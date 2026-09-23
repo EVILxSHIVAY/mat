@@ -11,6 +11,7 @@ import {
   getStorageData,
   setStorageData,
   STORAGE_KEYS,
+  inferUnit,
 } from "@/lib/dataService";
 import "@/components/ui/ui.css";
 import "./new-purchase.css";
@@ -88,9 +89,9 @@ export default function NewPurchasePage() {
       const reqMat = urlParams.get("material");
       const reqQty = Number(urlParams.get("qty")) || 50;
       const rawUnit = urlParams.get("unit");
-      const reqUnit = (rawUnit === "Meter" || rawUnit === "Pcs")
-        ? rawUnit
-        : (reqMat?.toLowerCase().includes("pipe") ? "Meter" : "Pcs");
+      const reqUnit = rawUnit === "Meter" || rawUnit === "Pcs"
+        ? (rawUnit === "Meter" ? inferUnit(reqMat) : "Pcs")
+        : inferUnit(reqMat);
       const reqLoc = urlParams.get("location");
       if (reqLoc) {
         setDetails((prev) => ({ ...prev, location: reqLoc }));
@@ -113,7 +114,7 @@ export default function NewPurchasePage() {
   // Material Line Item Helpers
   const handleAddLineItem = () => {
     const defaultMat = materialCatalog[0] || { name: "GI Pipe 1/2\"", unit: "Meter", defaultRate: 150 };
-    const inferredUnit = defaultMat.unit === "Meter" || defaultMat.name.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
+    const inferredUnit = inferUnit(defaultMat.name);
     const newItem = {
       materialName: defaultMat.name,
       unit: inferredUnit,
@@ -131,11 +132,9 @@ export default function NewPurchasePage() {
 
     if (field === "materialName") {
       const found = materialCatalog.find((m) => m.name === value);
+      copy[index].unit = found ? (found.unit || inferUnit(found.name)) : inferUnit(value);
       if (found) {
-        copy[index].unit = found.unit === "Meter" || found.name.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
         copy[index].rate = found.defaultRate || copy[index].rate;
-      } else {
-        copy[index].unit = value.toLowerCase().includes("pipe") ? "Meter" : "Pcs";
       }
     }
 
@@ -268,7 +267,7 @@ export default function NewPurchasePage() {
       setStorageData(STORAGE_KEYS.BILLS, [newBill, ...currentBills]);
     }
 
-    setMessage(`✓ Product request [${details.piNumber}] sent to ${details.supplier}! Supplier has received it in their portal and will approve/fulfill delivery to ${details.location}. Redirecting...`);
+    setMessage(`✓ Purchase [${details.piNumber}] recorded successfully for ${details.supplier}! Redirecting...`);
     setTimeout(() => {
       router.push("/purchases");
     }, 1200);
@@ -283,8 +282,8 @@ export default function NewPurchasePage() {
   return (
     <Shell>
       <Title
-        title="Request Products from Supplier / Purchase Order"
-        desc="Place product supply requests to registered suppliers. The supplier receives this request in their portal, approves it, and fulfills delivery to our project site."
+        title="Create Inward Purchase Order (PO / PI)"
+        desc="Create inward purchase orders, record materials, and track site delivery fulfillment."
       />
 
       {/* Stepper Header */}
@@ -303,47 +302,15 @@ export default function NewPurchasePage() {
         <section className="card formCard animate-fade-in">
           <div className="sectionHead">
             <div>
-              <h2>Step 1: Purchase Order & Supplier Assignment</h2>
-              <p>Select the registered supplier, purchase order number, and delivery destination site.</p>
+              <h2>Step 1: Purchase Order & Party Details</h2>
+              <p>Enter the purchase order number, supplier/vendor name, and delivery destination site.</p>
             </div>
           </div>
 
-          {suppliersList.length === 0 ? (
-            <div
-              style={{
-                padding: "18px 20px",
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                borderRadius: "8px",
-                color: "#991b1b",
-                marginBottom: "20px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "12px",
-              }}
-            >
-              <div>
-                <strong style={{ display: "block", fontSize: "14px", marginBottom: "4px" }}>
-                  ⚠️ No Registered Suppliers in Directory
-                </strong>
-                <span style={{ fontSize: "13px" }}>
-                  Orders can only be placed to suppliers registered in the Admin Suppliers Directory. Please add a supplier first.
-                </span>
-              </div>
-              <a
-                href="/suppliers"
-                className="btn btn-primary"
-                style={{ textDecoration: "none", fontSize: "13px", padding: "8px 14px", whiteSpace: "nowrap" }}
-              >
-                + Add Supplier in Directory ➔
-              </a>
-            </div>
-          ) : (
-            <div className="formGrid">
+          <div className="formGrid">
+            {suppliersList.length > 0 ? (
               <SearchableSelect
-                label="Supplier (from Admin Directory) *"
+                label="Supplier / Vendor *"
                 required
                 options={suppliersList.map((s) => `${s.name}${s.code ? ` (${s.code})` : ""}`)}
                 value={
@@ -361,8 +328,20 @@ export default function NewPurchasePage() {
                     supplierCode: match ? match.code : "",
                   });
                 }}
-                placeholder="Choose registered supplier..."
+                placeholder="Choose supplier or vendor..."
               />
+            ) : (
+              <label>
+                Supplier / Vendor *
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter supplier or vendor name"
+                  value={details.supplier}
+                  onChange={(e) => setDetails({ ...details, supplier: e.target.value })}
+                />
+              </label>
+            )}
 
               <label>
                 Purchase / PO Number *
@@ -418,16 +397,15 @@ export default function NewPurchasePage() {
                 />
               </label>
             </div>
-          )}
 
           <div className="stepFooter">
             <button
               type="button"
               className="primary"
-              disabled={suppliersList.length === 0 || !details.supplier}
+              disabled={!details.supplier}
               onClick={() => {
                 if (!details.supplier) {
-                  alert("Please choose a supplier from the directory.");
+                  alert("Please enter or select a supplier / vendor.");
                   return;
                 }
                 setCurrentStep(2);
@@ -967,7 +945,7 @@ export default function NewPurchasePage() {
               disabled={isSubmitting}
               onClick={handleConfirmPurchase}
             >
-              {isSubmitting ? "Sending Request..." : "🚀 Send Product Request to Supplier"}
+              {isSubmitting ? "Recording Purchase..." : "✓ Confirm & Record Purchase"}
             </button>
           </div>
         </section>

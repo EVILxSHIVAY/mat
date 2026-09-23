@@ -36,6 +36,7 @@ export default function InventoryView({ initialFilter = "" }) {
   // Stock Adjustment Modal state
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [adjustingProduct, setAdjustingProduct] = useState(null);
+  const [adjustingCompany, setAdjustingCompany] = useState("");
 
   const refreshInventory = () => {
     const fresh = calculateLiveInventory();
@@ -61,8 +62,9 @@ export default function InventoryView({ initialFilter = "" }) {
     return () => window.removeEventListener("pdv_stock_updated", handleStockUpdated);
   }, [selectedProduct]);
 
-  const handleOpenAdjustModal = (product = null) => {
+  const handleOpenAdjustModal = (product = null, company = "") => {
     setAdjustingProduct(product);
+    setAdjustingCompany(company);
     setIsAdjustModalOpen(true);
   };
 
@@ -71,10 +73,10 @@ export default function InventoryView({ initialFilter = "" }) {
     return inventoryList.filter((item) => {
       const name = String(item.name || "").toLowerCase();
       const cat = String(item.category || "").toLowerCase();
-      const loc = String(item.location || "").toLowerCase();
+      const comp = String(item.company || "").toLowerCase();
       const s = search.toLowerCase().trim();
 
-      const matchesSearch = !s || name.includes(s) || cat.includes(s) || loc.includes(s);
+      const matchesSearch = !s || name.includes(s) || cat.includes(s) || comp.includes(s);
 
       const matchesCat =
         selectedCategory === "All Categories" || item.category === selectedCategory;
@@ -102,7 +104,7 @@ export default function InventoryView({ initialFilter = "" }) {
       "Available Stock",
       "Unit",
       "Status",
-      "Location",
+      "Company",
       "Rate (₹)",
       "Stock Value (₹)",
     ];
@@ -112,7 +114,7 @@ export default function InventoryView({ initialFilter = "" }) {
       i.availableStock,
       i.unit,
       i.status,
-      i.location,
+      i.company,
       i.rate,
       i.stockValue,
     ]);
@@ -193,7 +195,7 @@ export default function InventoryView({ initialFilter = "" }) {
               <span>🔍</span>
               <input
                 type="text"
-                placeholder="Search material, category, or location..."
+                placeholder="Search material, category, or company..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -238,83 +240,110 @@ export default function InventoryView({ initialFilter = "" }) {
               </button>
             </div>
           ) : (
-            filteredInventory.map((item) => (
-              <div
-                key={item.code}
-                className="mobileDataCard"
-                onClick={() => {
-                  setSelectedProduct(item);
-                  setDrawerTab("overview");
-                }}
-              >
-                <div className="mobileCardHeader">
-                  <div className="mobileCardTitleArea">
-                    <div style={{ marginBottom: "4px" }}>
-                      <span className="categoryTag" style={{ fontSize: "11px" }}>{item.category}</span>
+            filteredInventory.map((item) => {
+              const hasCompanies = item.companies && item.companies.length > 0;
+              return (
+                <div
+                  key={item.code || item.name}
+                  className="mobileDataCard"
+                  onClick={() => {
+                    setSelectedProduct(item);
+                    setDrawerTab("overview");
+                  }}
+                >
+                  <div className="mobileCardHeader">
+                    <div className="mobileCardTitleArea">
+                      <div style={{ marginBottom: "4px" }}>
+                        <span className="categoryTag" style={{ fontSize: "11px" }}>{item.category}</span>
+                      </div>
+                      <h3 className="mobileCardTitle">{item.name}</h3>
                     </div>
-                    <h3 className="mobileCardTitle">{item.name}</h3>
+                    <Badge>{item.status}</Badge>
                   </div>
-                  <Badge>{item.status}</Badge>
-                </div>
 
-                <div className="mobileCardBody">
-                  <div className="mobileMetricItem">
-                    <span className="mobileMetricLabel">Available Stock</span>
-                    <strong className="mobileMetricVal highlight">
-                      {item.availableStock} {item.unit}
-                    </strong>
+                  <div className="mobileCardBody">
+                    <div className="mobileMetricItem">
+                      <span className="mobileMetricLabel">Total Available</span>
+                      <strong className="mobileMetricVal highlight">
+                        {item.availableStock} {item.unit}
+                      </strong>
+                    </div>
+                    <div className="mobileMetricItem">
+                      <span className="mobileMetricLabel">Company Rates</span>
+                      <strong className="mobileMetricVal">
+                        {!hasCompanies
+                          ? "—"
+                          : item.companies.length > 1
+                          ? `${item.companies.length} Companies`
+                          : `₹ ${Number(item.companies[0].rate).toLocaleString("en-IN")}`}
+                      </strong>
+                    </div>
                   </div>
-                  <div className="mobileMetricItem">
-                    <span className="mobileMetricLabel">Std Rate</span>
-                    <strong className="mobileMetricVal">₹ {item.rate}</strong>
-                  </div>
-                </div>
 
-                <div className="mobileCardFooter">
-                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                    📍 {item.location}
-                  </span>
-                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                    <button
-                      type="button"
-                      className="actionBtn edit"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenAdjustModal(item);
-                      }}
-                    >
-                      + Add Qty
-                    </button>
-                    <button
-                      type="button"
-                      className="actionBtn view"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedProduct(item);
-                        setDrawerTab("overview");
-                      }}
-                    >
-                      Inspect →
-                    </button>
+                  {/* Company Breakdown on Mobile */}
+                  <div className="mobileCompanySection">
+                    {!hasCompanies ? (
+                      <div className="mobileEmptyNotice">
+                        <span>No company or stock added yet</span>
+                      </div>
+                    ) : (
+                      item.companies.map((c, cIdx) => (
+                        <div key={cIdx} className="mobileCompanyRow">
+                          <span className="mobileCompanyName">🏢 {c.name}</span>
+                          <span className="mobileCompanyDetails">
+                            {Number(c.stock).toLocaleString("en-IN")} {item.unit} @ ₹{Number(c.rate).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="mobileCardFooter">
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                      {hasCompanies ? `${item.companies.length} Supplier${item.companies.length > 1 ? "s" : ""}` : "Unassigned"}
+                    </span>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <button
+                        type="button"
+                        className="actionBtn edit"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAdjustModal(item);
+                        }}
+                      >
+                        + Manage Stock
+                      </button>
+                      <button
+                        type="button"
+                        className="actionBtn view"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProduct(item);
+                          setDrawerTab("overview");
+                        }}
+                      >
+                        Inspect →
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
         {/* 2. Desktop Data Table (Visible on > 768px) */}
         <div className="tableScroll">
-          <table>
+          <table className="inventoryTable">
             <thead>
               <tr>
-                <th>Material Description</th>
-                <th>Category</th>
-                <th>Available Stock</th>
-                <th>Status</th>
-                <th>Location</th>
-                <th>Rate (₹)</th>
-                <th>Action</th>
+                <th className="colMaterial">Material Description</th>
+                <th className="colCategory">Category</th>
+                <th className="colCompany">Company</th>
+                <th className="colRate">Company Rate (₹)</th>
+                <th className="colStock">Available Stock</th>
+                <th className="colStatus">Status</th>
+                <th className="colAction">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -325,54 +354,134 @@ export default function InventoryView({ initialFilter = "" }) {
                   </td>
                 </tr>
               ) : (
-                filteredInventory.map((item) => (
-                  <tr
-                    key={item.name}
-                    onClick={() => {
-                      setSelectedProduct(item);
-                      setDrawerTab("overview");
-                    }}
-                  >
-                    <td>
-                      <strong>{item.name}</strong>
-                    </td>
-                    <td>{item.category}</td>
-                    <td>
-                      <b className="stockNumber">{item.availableStock}</b> {item.unit}
-                    </td>
-                    <td>
-                      <Badge>{item.status}</Badge>
-                    </td>
-                    <td>{item.location}</td>
-                    <td>₹ {item.rate}</td>
-                    <td>
-                      <div className="actionBtnGroup">
-                        <button
-                          type="button"
-                          className="actionBtn edit"
-                          title="Add quantity or edit price"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenAdjustModal(item);
-                          }}
-                        >
-                          + Add Qty / Price
-                        </button>
-                        <button
-                          type="button"
-                          className="actionBtn view"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedProduct(item);
-                            setDrawerTab("overview");
-                          }}
-                        >
-                          Inspect →
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredInventory.map((item) => {
+                  const hasCompanies = item.companies && item.companies.length > 0;
+                  return (
+                    <tr
+                      key={item.name}
+                      onClick={() => {
+                        setSelectedProduct(item);
+                        setDrawerTab("overview");
+                      }}
+                    >
+                      {/* Material Description */}
+                      <td className="colMaterial">
+                        <div className="materialNameBox">
+                          <strong className="materialPrimaryName">{item.name}</strong>
+                          {item.code && <span className="materialCodeBadge">{item.code}</span>}
+                        </div>
+                      </td>
+
+                      {/* Category */}
+                      <td className="colCategory">
+                        <span className="categoryBadgePill">{item.category}</span>
+                      </td>
+
+                      {/* Company Column */}
+                      <td className="colCompany">
+                        {!hasCompanies ? (
+                          <span className="emptyCellDash">—</span>
+                        ) : item.companies.length === 1 ? (
+                          <div className="singleCellComp">
+                            <span className="compNameText">{item.companies[0].name}</span>
+                          </div>
+                        ) : (
+                          <div className="tableMultiList">
+                            {item.companies.map((c, cIdx) => (
+                              <div key={cIdx} className="tableMultiRow">
+                                <span className="compBullet">🏢</span>
+                                <span className="compNameText" title={c.name}>{c.name}</span>
+                              </div>
+                            ))}
+                            <div className="tableMultiRow totalPlaceholder">
+                              <span style={{ visibility: "hidden" }}>—</span>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Company Rate (₹) Column */}
+                      <td className="colRate textRight">
+                        {!hasCompanies ? (
+                          <span className="emptyCellDash">—</span>
+                        ) : item.companies.length === 1 ? (
+                          <div className="singleCellRate">
+                            ₹ {Number(item.companies[0].rate).toLocaleString("en-IN")}
+                          </div>
+                        ) : (
+                          <div className="tableMultiList alignRight">
+                            {item.companies.map((c, cIdx) => (
+                              <div key={cIdx} className="tableMultiRow alignRight">
+                                <span className="rateVal">₹ {Number(c.rate).toLocaleString("en-IN")}</span>
+                              </div>
+                            ))}
+                            <div className="tableMultiRow totalPlaceholder">
+                              <span style={{ visibility: "hidden" }}>—</span>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Available Stock Column */}
+                      <td className="colStock textRight">
+                        {!hasCompanies ? (
+                          <span className="emptyCellDash">0 {item.unit}</span>
+                        ) : item.companies.length === 1 ? (
+                          <div className="singleCellStock">
+                            <strong className="stockVal">{Number(item.companies[0].stock).toLocaleString("en-IN")}</strong>{" "}
+                            <span className="unitLabel">{item.unit}</span>
+                          </div>
+                        ) : (
+                          <div className="tableMultiList alignRight">
+                            {item.companies.map((c, cIdx) => (
+                              <div key={cIdx} className="tableMultiRow alignRight">
+                                <span className="stockVal">{Number(c.stock).toLocaleString("en-IN")}</span>{" "}
+                                <span className="unitLabel">{item.unit}</span>
+                              </div>
+                            ))}
+                            <div className="tableMultiRow totalRow alignRight">
+                              <span className="totalLabel">Total:</span>{" "}
+                              <strong className="totalVal">{Number(item.availableStock).toLocaleString("en-IN")} {item.unit}</strong>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Status Column */}
+                      <td className="colStatus textCenter">
+                        <Badge>{item.status}</Badge>
+                      </td>
+
+                      {/* Action Column */}
+                      <td className="colAction textCenter">
+                        <div className="actionBtnGroup">
+                          <button
+                            type="button"
+                            className="actionBtn edit"
+                            title="Manage company rate and quantity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenAdjustModal(item);
+                            }}
+                          >
+                            + Manage Stock
+                          </button>
+                          <button
+                            type="button"
+                            className="actionBtn view"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedProduct(item);
+                              setDrawerTab("overview");
+                            }}
+                          >
+                            Inspect →
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -450,7 +559,7 @@ export default function InventoryView({ initialFilter = "" }) {
         isOpen={Boolean(selectedProduct)}
         onClose={() => setSelectedProduct(null)}
         title={selectedProduct?.name || "Product History"}
-        subtitle={`Category: ${selectedProduct?.category} · Location: ${selectedProduct?.location}`}
+        subtitle={`Category: ${selectedProduct?.category} · Supplied by: ${selectedProduct?.company}`}
         badge={<Badge>{selectedProduct?.status}</Badge>}
         tabs={drawerTabs}
         activeTab={drawerTab}
@@ -478,14 +587,24 @@ export default function InventoryView({ initialFilter = "" }) {
                     </strong>
                   </div>
                   <div className="drawerMetricCard">
-                    <span className="drawerMetricLabel">Storage Location</span>
+                    <span className="drawerMetricLabel">Supplying Company</span>
                     <strong className="drawerMetricVal" style={{ fontSize: "14px" }}>
-                      {selectedProduct.location}
+                      {!selectedProduct.companies || selectedProduct.companies.length === 0
+                        ? "—"
+                        : selectedProduct.companies.length > 1
+                        ? `${selectedProduct.companies.length} Companies`
+                        : selectedProduct.companies[0].name}
                     </strong>
                   </div>
                   <div className="drawerMetricCard">
-                    <span className="drawerMetricLabel">Standard Rate</span>
-                    <strong className="drawerMetricVal">₹ {selectedProduct.rate}</strong>
+                    <span className="drawerMetricLabel">Company Rate</span>
+                    <strong className="drawerMetricVal">
+                      {!selectedProduct.companies || selectedProduct.companies.length === 0
+                        ? "—"
+                        : selectedProduct.companies.length > 1
+                        ? `${selectedProduct.companies.length} Rates`
+                        : `₹ ${Number(selectedProduct.companies[0].rate).toLocaleString("en-IN")}`}
+                    </strong>
                   </div>
                 </div>
 
@@ -496,8 +615,77 @@ export default function InventoryView({ initialFilter = "" }) {
                     style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                     onClick={() => handleOpenAdjustModal(selectedProduct)}
                   >
-                    <span>➕</span> Add Quantity & Edit Price
+                    <span>➕</span> Manage Company, Rate & Quantity
                   </button>
+                </div>
+
+                {/* Company Breakdown Table */}
+                <div className="companyBreakdownCard">
+                  <div className="companyBreakdownHead">
+                    <span className="companyBreakdownTitle">🏢 Company-wise Rates & Available Stock</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: "11px", padding: "4px 8px" }}
+                      onClick={() => handleOpenAdjustModal(selectedProduct)}
+                    >
+                      + Add Company
+                    </button>
+                  </div>
+                  <div className="companyTableWrap">
+                    {!selectedProduct.companies || selectedProduct.companies.length === 0 ? (
+                      <div style={{ padding: "18px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
+                        No companies or stock recorded for this product yet.
+                      </div>
+                    ) : (
+                      <table className="companyBreakdownTable">
+                        <thead>
+                          <tr>
+                            <th>Company / Supplier</th>
+                            <th style={{ textAlign: "right" }}>Rate (₹)</th>
+                            <th style={{ textAlign: "right" }}>Available Stock</th>
+                            <th style={{ textAlign: "right" }}>Valuation</th>
+                            <th style={{ textAlign: "center" }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedProduct.companies.map((c, cIdx) => (
+                            <tr key={cIdx}>
+                              <td>
+                                <strong>🏢 {c.name}</strong>
+                              </td>
+                              <td style={{ textAlign: "right" }}>
+                                <span className="companyRateTag">₹ {Number(c.rate).toLocaleString("en-IN")}</span>
+                              </td>
+                              <td style={{ textAlign: "right" }}>
+                                <b className="companyStockHighlight">{Number(c.stock).toLocaleString("en-IN")} {selectedProduct.unit}</b>
+                              </td>
+                              <td style={{ textAlign: "right", fontFamily: "var(--font-mono, monospace)" }}>
+                                ₹ {((Number(c.stock) || 0) * (Number(c.rate) || 0)).toLocaleString("en-IN")}
+                              </td>
+                              <td style={{ textAlign: "center" }}>
+                                <button
+                                  type="button"
+                                  className="actionBtn edit"
+                                  style={{ padding: "3px 8px", fontSize: "11px" }}
+                                  onClick={() => handleOpenAdjustModal(selectedProduct, c.name)}
+                                >
+                                  ✏️ Edit
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="companyTableTotalRow">
+                            <td><strong>Consolidated Total</strong></td>
+                            <td style={{ textAlign: "right" }}>—</td>
+                            <td style={{ textAlign: "right" }}><strong>{Number(selectedProduct.availableStock).toLocaleString("en-IN")} {selectedProduct.unit}</strong></td>
+                            <td style={{ textAlign: "right" }}><strong>₹ {Number(selectedProduct.stockValue || 0).toLocaleString("en-IN")}</strong></td>
+                            <td></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
 
                 <h4 className="drawerSectionTitle">Material Master Data</h4>
@@ -507,13 +695,13 @@ export default function InventoryView({ initialFilter = "" }) {
                     <span className="drawerKvVal">{selectedProduct.category}</span>
                   </div>
                   <div className="drawerKvRow">
-                    <span className="drawerKvLabel">Storage Location:</span>
-                    <span className="drawerKvVal">{selectedProduct.location}</span>
+                    <span className="drawerKvLabel">Supplied by Company:</span>
+                    <span className="drawerKvVal">{selectedProduct.company}</span>
                   </div>
                   <div className="drawerKvRow">
-                    <span className="drawerKvLabel">Inventory Valuation:</span>
+                    <span className="drawerKvLabel">Total Valuation:</span>
                     <span className="drawerKvVal">
-                      ₹ {(selectedProduct.availableStock * (selectedProduct.rate || 0)).toLocaleString()}
+                      ₹ {(selectedProduct.stockValue || 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -631,9 +819,13 @@ export default function InventoryView({ initialFilter = "" }) {
       {/* Stock Adjustment Modal */}
       <StockAdjustModal
         isOpen={isAdjustModalOpen}
-        onClose={() => setIsAdjustModalOpen(false)}
+        onClose={() => {
+          setIsAdjustModalOpen(false);
+          setAdjustingCompany("");
+        }}
         products={inventoryList}
         initialProduct={adjustingProduct}
+        initialCompany={adjustingCompany}
         onStockUpdated={() => refreshInventory()}
       />
     </Shell>

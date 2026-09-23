@@ -79,7 +79,7 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search anything... (materials, stock, suppliers, PI#, vouchers, sites)"
+            placeholder="Search anything... (materials, stock, vendors, PI#, vouchers, sites)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -93,7 +93,7 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
           {results.length === 0 ? (
             <div className="searchEmpty">
               <p>No matches found for "{query}"</p>
-              <small>Try searching for a product name, voucher code, supplier or site.</small>
+              <small>Try searching for a product name, voucher code, vendor or site.</small>
             </div>
           ) : (
             results.map((item, idx) => (

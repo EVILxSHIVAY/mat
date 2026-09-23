@@ -424,12 +424,12 @@ export default function VendorsPage() {
                           ✏ Edit
                         </button>
                         <Link
-                          href={`/material-issue?vendor=${encodeURIComponent(v.name)}`}
+                          href={`/material-requests?vendor=${encodeURIComponent(v.name)}`}
                           className="btn btn-sm primary"
                           style={{ textDecoration: "none" }}
-                          title="Issue material to this vendor"
+                          title="View requests and issue material to this vendor"
                         >
-                          Issue ↗
+                          Requests & Issue ↗
                         </Link>
                       </div>
                     </td>
@@ -542,11 +542,11 @@ export default function VendorsPage() {
 
                 <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
                   <Link
-                    href={`/material-issue?vendor=${encodeURIComponent(selectedVendor.name)}`}
+                    href={`/material-requests?vendor=${encodeURIComponent(selectedVendor.name)}`}
                     className="primary"
                     style={{ textDecoration: "none", flex: 1, textAlign: "center" }}
                   >
-                    ↗ Issue Material to {selectedVendor.name}
+                    📋 Requests & Issue for {selectedVendor.name}
                   </Link>
                   <button
                     type="button"
@@ -625,11 +625,11 @@ export default function VendorsPage() {
                               </span>
                             ) : (
                               <Link
-                                href={`/material-issue?vendor=${encodeURIComponent(selectedVendor.name)}&material=${encodeURIComponent(req.materialName)}&qty=${qtyToIssue}&unit=${encodeURIComponent(req.unit || "Pcs")}&reqId=${encodeURIComponent(req.id || "")}`}
+                                href={`/material-requests?vendor=${encodeURIComponent(selectedVendor.name)}`}
                                 className="btn btn-sm primary"
                                 style={{ textDecoration: "none" }}
                               >
-                                {isPartiallyIssued ? `Issue Remaining (${qtyToIssue}) ↗` : "Issue Material ↗"}
+                                View in Requests Board ↗
                               </Link>
                             )}
                           </div>
@@ -649,10 +649,10 @@ export default function VendorsPage() {
                     Dispatched warehouse vouchers issued to this vendor
                   </span>
                   <Link
-                    href={`/material-issue?vendor=${encodeURIComponent(selectedVendor.name)}`}
+                    href={`/material-requests?vendor=${encodeURIComponent(selectedVendor.name)}`}
                     className="btn btn-sm primary"
                   >
-                    + New Issue
+                    + Issue from Requests
                   </Link>
                 </div>
 

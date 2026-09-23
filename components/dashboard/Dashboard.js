@@ -27,8 +27,8 @@ export default function Dashboard() {
         </div>
 
         <div className="dashQuickActions">
-          <Link href="/material-issue" className="dashActionBtn primary">
-            <span>↗ Issue Material</span>
+          <Link href="/material-requests" className="dashActionBtn primary">
+            <span>📋 Vendor Requests & Issue</span>
           </Link>
           <Link href="/material-consumption" className="dashActionBtn">
             <span>◔ Consumption</span>
@@ -261,11 +261,11 @@ export default function Dashboard() {
               </div>
             </Link>
 
-            <Link href="/material-issue" className="opsCard">
-              <span className="opsIcon">↗</span>
+            <Link href="/material-requests" className="opsCard">
+              <span className="opsIcon">📋</span>
               <div>
-                <b>Material Issue</b>
-                <small>Dispatch voucher & sites</small>
+                <b>Vendor Requests & Issue</b>
+                <small>Review, approve & issue stock</small>
               </div>
             </Link>
 
@@ -281,7 +281,7 @@ export default function Dashboard() {
               <span className="opsIcon">⚖</span>
               <div>
                 <b>Party & Site Ledger</b>
-                <small>Requisitions & payments</small>
+                <small>Requisitions & material issues</small>
               </div>
             </Link>
 

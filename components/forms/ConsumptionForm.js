@@ -9,6 +9,7 @@ import {
   getStorageData,
   setStorageData,
   STORAGE_KEYS,
+  inferUnit,
 } from "@/lib/dataService";
 import "@/components/ui/ui.css";
 import "./consumption.css";
@@ -76,7 +77,7 @@ export default function ConsumptionForm() {
 
     const rows = rawItems.map((item) => {
       const name = item.name || item.materialName;
-      const unit = (item.unit === "Meter" || String(name).toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
+      const unit = inferUnit(name);
       const issuedQty = Number(item.quantity || item.qty) || 0;
       const prevUsed = priorUsageMap[name.toLowerCase()] || 0;
       const balance = Math.max(0, issuedQty - prevUsed);

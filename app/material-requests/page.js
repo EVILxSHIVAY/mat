@@ -12,6 +12,8 @@ import {
   STORAGE_KEYS,
   calculateLiveInventory,
   getMasterMaterialCatalog,
+  deductProductCompanyStock,
+  inferUnit,
 } from "@/lib/dataService";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import "@/components/ui/ui.css";
@@ -43,6 +45,7 @@ export default function VendorRequestsPage() {
   // Issue Quantity Modal State (For fulfilling requests with exact quantity & shortage control)
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [issueRequestTarget, setIssueRequestTarget] = useState(null);
+  const [selectedIssueCompany, setSelectedIssueCompany] = useState("");
   const [issueQuantity, setIssueQuantity] = useState("");
   const [issueChallanNo, setIssueChallanNo] = useState("");
   const [issueNotes, setIssueNotes] = useState("");
@@ -118,7 +121,7 @@ export default function VendorRequestsPage() {
       siteName: "Jaipur Project Site",
       materialName: defaultMat.name,
       quantityNeeded: 25,
-      unit: (defaultMat.unit === "Meter" || defaultMat.name.toLowerCase().includes("pipe")) ? "Meter" : "Pcs",
+      unit: inferUnit(defaultMat.name),
       priority: "Normal",
       requiredByDate: new Date().toISOString().split("T")[0],
       remarks: "",
@@ -140,7 +143,7 @@ export default function VendorRequestsPage() {
       siteName: newReq.siteName || "Central Warehouse",
       materialName: newReq.materialName,
       quantityNeeded: Math.max(1, Number(newReq.quantityNeeded) || 1),
-      unit: (newReq.unit === "Meter" || newReq.materialName.toLowerCase().includes("pipe")) ? "Meter" : "Pcs",
+      unit: inferUnit(newReq.materialName),
       priority: newReq.priority || "Normal",
       status: "Pending Approval",
       createdAt: "Today · " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -175,11 +178,17 @@ export default function VendorRequestsPage() {
     const challan = `MI-${Date.now().toString().slice(-4)}`;
     setIssueChallanNo(challan);
 
-    // Look up warehouse available stock for this material
+    // Look up warehouse available stock and companies for this material
     const sName = (reqItem.materialName || "").toLowerCase().trim();
     const stockItem = liveInventory.find(
       (i) => i?.name && (i.name.toLowerCase().trim() === sName || sName.includes(i.name.toLowerCase().trim()))
     );
+    const companies = (stockItem?.companies && stockItem.companies.length > 0)
+      ? stockItem.companies
+      : (stockItem?.company ? [{ name: stockItem.company, stock: stockItem.availableStock || 0 }] : []);
+    const bestComp = companies.find((c) => (Number(c.stock) || 0) > 0)?.name || companies[0]?.name || "";
+    setSelectedIssueCompany(bestComp);
+
     const available = stockItem ? stockItem.availableStock : 0;
     const requested = Number(reqItem.quantityNeeded) || 1;
     const alreadyIssued = Number(reqItem.issuedQty) || 0;
@@ -189,7 +198,7 @@ export default function VendorRequestsPage() {
     const defaultQty = available > 0 ? Math.min(available, remaining) : (remaining > 0 ? remaining : 1);
     setIssueQuantity(String(defaultQty));
 
-    const unit = (reqItem.unit === "Meter" || reqItem.materialName?.toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
+    const unit = inferUnit(reqItem.materialName);
     if (available < remaining) {
       setIssueNotes(`Partial dispatch: ${defaultQty} ${unit} issued due to warehouse stock shortage (${remaining - defaultQty} ${unit} pending)`);
     } else {
@@ -212,7 +221,7 @@ export default function VendorRequestsPage() {
 
     const currentIssues = getStorageData(STORAGE_KEYS.ISSUES, []);
     const req = issueRequestTarget;
-    const unit = (req.unit === "Meter" || req.materialName?.toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
+    const unit = inferUnit(req.materialName);
     const requestedTotal = Number(req.quantityNeeded) || 1;
     const priorIssued = Number(req.issuedQty) || 0;
     const newTotalIssued = priorIssued + numToIssue;
@@ -227,12 +236,14 @@ export default function VendorRequestsPage() {
       site: req.siteName || "Project Site",
       itemsCount: 1,
       status: "Issued",
+      company: selectedIssueCompany || "",
       materials: [
         {
           name: req.materialName,
           quantity: numToIssue,
           unit: unit,
           category: "General Materials",
+          company: selectedIssueCompany || "",
         },
       ],
       reqId: req.id,
@@ -243,7 +254,14 @@ export default function VendorRequestsPage() {
     // 1. Save to Issues ledger
     setStorageData(STORAGE_KEYS.ISSUES, [newIssueRecord, ...currentIssues]);
 
-    // 2. Update request in store
+    // 2. Deduct company stock from inventory adjustments
+    try {
+      deductProductCompanyStock(req.materialName, selectedIssueCompany, numToIssue);
+    } catch (err) {
+      console.warn("Could not deduct stock:", err);
+    }
+
+    // 3. Update request in store
     const updatedRequests = requests.map((r) => {
       if (r === req || r.id === req.id) {
         return {
@@ -258,6 +276,7 @@ export default function VendorRequestsPage() {
             {
               challanNo: newIssueRecord.number,
               issuedQty: numToIssue,
+              company: selectedIssueCompany || "",
               date: new Date().toISOString(),
               notes: issueNotes.trim(),
             },
@@ -269,7 +288,7 @@ export default function VendorRequestsPage() {
     });
     saveRequestsList(updatedRequests);
 
-    // 3. Update live inventory state
+    // 4. Update live inventory state
     const freshInventory = calculateLiveInventory();
     setLiveInventory(freshInventory);
 
@@ -285,7 +304,7 @@ export default function VendorRequestsPage() {
 
     setIsIssueModalOpen(false);
     setActionNotice(
-      `✓ Successfully issued ${numToIssue} ${unit} to ${req.vendor || req.partyName}! (Challan: ${newIssueRecord.number})${
+      `✓ Successfully issued ${numToIssue} ${unit} ${selectedIssueCompany ? `from ${selectedIssueCompany} ` : ""}to ${req.vendor || req.partyName}! (Challan: ${newIssueRecord.number})${
         newRemaining > 0 ? ` ⚠️ Shortage: ${newRemaining} ${unit} remaining.` : " All requested quantity fulfilled."
       }`
     );
@@ -348,7 +367,7 @@ export default function VendorRequestsPage() {
     <Shell>
       <Title
         title="Vendor Requests"
-        desc="Material requisitions submitted by field vendors & site teams. Verify warehouse live stock, approve requests, issue materials, or order from suppliers."
+        desc="Material requisitions submitted by field vendors & site teams. Verify warehouse live stock, approve requests, and issue materials to sites."
         action={
           <div style={{ display: "flex", gap: "8px" }}>
             <button
@@ -750,35 +769,15 @@ export default function VendorRequestsPage() {
               )}
 
               {selectedRequest.status !== "Issued" && selectedRequest.status !== "Rejected" && (
-                <>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    style={{ flex: 1.5, minHeight: "44px", background: "#059669", borderColor: "#047857" }}
-                    onClick={() => handleOpenIssueModal(selectedRequest)}
-                  >
-                    ⚡ Issue Material (Specify Qty)
-                  </button>
-
-                  <Link
-                    href={`/material-issue?vendor=${encodeURIComponent(selectedRequest.vendor || selectedRequest.partyName || "")}&material=${encodeURIComponent(selectedRequest.materialName || "")}&qty=${selectedRequest.remainingNeeded || selectedRequest.quantityNeeded || 1}&unit=${encodeURIComponent(selectedRequest.unit || "Pcs")}&reqId=${encodeURIComponent(selectedRequest.id || "")}`}
-                    className="btn btn-secondary"
-                    style={{ minHeight: "44px", textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                    title="Open custom Issue Voucher form"
-                  >
-                    ↗ Issue Form
-                  </Link>
-                </>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ flex: 1.5, minHeight: "44px", background: "#059669", borderColor: "#047857" }}
+                  onClick={() => handleOpenIssueModal(selectedRequest)}
+                >
+                  ⚡ Issue Material (Specify Qty)
+                </button>
               )}
-
-              <Link
-                href={`/purchases/new?material=${encodeURIComponent(selectedRequest.materialName || "")}&qty=${encodeURIComponent(selectedRequest.remainingNeeded || selectedRequest.quantityNeeded || 50)}&unit=${encodeURIComponent(selectedRequest.unit || "Pcs")}&location=${encodeURIComponent(selectedRequest.siteName || selectedRequest.partyName || "Central Warehouse")}`}
-                className="btn btn-secondary"
-                style={{ minHeight: "44px", textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: "600" }}
-                title="Request this product from an external supplier"
-              >
-                📦 Request from Supplier
-              </Link>
 
               {selectedRequest.status !== "Rejected" && selectedRequest.status !== "Issued" && (
                 <button
@@ -887,6 +886,34 @@ export default function VendorRequestsPage() {
                       {hasEnough ? "Stock Ready" : "Stock Shortage"}
                     </Badge>
                   </div>
+
+                  {/* Company breakdown */}
+                  {selectedProductStock?.companies && selectedProductStock.companies.length > 0 && (
+                    <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px solid rgba(0,0,0,0.06)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
+                        🏢 Supplying Companies & Stock
+                      </span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "2px" }}>
+                        {selectedProductStock.companies.map((c) => (
+                          <span
+                            key={c.name}
+                            style={{
+                              fontSize: "12px",
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              background: "#ffffff",
+                              border: "1px solid var(--border-default, #e2e8f0)",
+                              fontWeight: 600,
+                              color: "var(--text-primary)",
+                            }}
+                          >
+                            🏢 {c.name}: <strong style={{ color: (c.stock || 0) > 0 ? "#059669" : "#dc2626" }}>{c.stock ?? 0} {selectedProductStock.unit}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {!hasEnough && selectedRequest.status !== "Issued" && (
                     <div style={{ marginTop: "10px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
                       <button
@@ -897,13 +924,6 @@ export default function VendorRequestsPage() {
                       >
                         ⚡ Issue Available Quantity
                       </button>
-                      <Link
-                        href={`/purchases/new?material=${encodeURIComponent(selectedRequest.materialName)}&qty=${reqQtyEffective}&unit=${encodeURIComponent(selectedRequest.unit || "Pcs")}&location=${encodeURIComponent(selectedRequest.siteName || "Central Warehouse")}`}
-                        className="btn btn-sm btn-secondary"
-                        style={{ textDecoration: "none", fontSize: "12px", fontWeight: 600 }}
-                      >
-                        📦 Order Shortage from Supplier ↗
-                      </Link>
                     </div>
                   )}
                 </div>
@@ -1001,7 +1021,7 @@ export default function VendorRequestsPage() {
                         onChange={(e) => {
                           const matName = e.target.value;
                           const found = materialCatalog.find((m) => m.name === matName);
-                          const inferredUnit = (found?.unit === "Meter" || matName.toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
+                          const inferredUnit = found?.unit || inferUnit(matName);
                           setNewReq({
                             ...newReq,
                             materialName: matName,
@@ -1027,7 +1047,7 @@ export default function VendorRequestsPage() {
                           setNewReq({
                             ...newReq,
                             materialName: val,
-                            unit: val.toLowerCase().includes("pipe") ? "Meter" : "Pcs",
+                            unit: inferUnit(val),
                           });
                         }}
                       />
@@ -1117,11 +1137,16 @@ export default function VendorRequestsPage() {
         const stockItem = liveInventory.find(
           (i) => i?.name && (i.name.toLowerCase().trim() === sName || sName.includes(i.name.toLowerCase().trim()))
         );
-        const availableStock = stockItem ? stockItem.availableStock : 0;
+        const targetCompanies = (stockItem?.companies && stockItem.companies.length > 0)
+          ? stockItem.companies
+          : (stockItem?.company ? [{ name: stockItem.company, stock: stockItem.availableStock || 0 }] : []);
+        const activeComp = targetCompanies.find((c) => c.name === selectedIssueCompany) || targetCompanies[0];
+        const activeCompStock = activeComp ? (Number(activeComp.stock) || 0) : (stockItem ? stockItem.availableStock : 0);
+        const availableStock = activeComp ? activeCompStock : (stockItem ? stockItem.availableStock : 0);
         const requestedTotal = Number(req.quantityNeeded) || 1;
         const priorIssued = Number(req.issuedQty) || 0;
         const remainingNeeded = Math.max(0, requestedTotal - priorIssued);
-        const unit = (req.unit === "Meter" || req.materialName?.toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
+        const unit = inferUnit(req.materialName);
         const enteredQty = Number(issueQuantity) || 0;
         const isStockShortage = availableStock < remainingNeeded;
         const resultingIssued = priorIssued + enteredQty;
@@ -1217,6 +1242,91 @@ export default function VendorRequestsPage() {
                     </div>
                   </div>
 
+                  {/* Supplying Company / Inventory Stock Source */}
+                  <div
+                    style={{
+                      background: "var(--surface-subtle, #f8fafc)",
+                      border: "1px solid var(--border-default, #e2e8f0)",
+                      borderRadius: "10px",
+                      padding: "12px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <label style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--text-primary)" }}>
+                        🏢 Supplying Company (Stock Source)
+                      </label>
+                      {targetCompanies.length > 0 && (
+                        <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 600 }}>
+                          {targetCompanies.length} company source{targetCompanies.length > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+
+                    {targetCompanies.length > 1 ? (
+                      <div>
+                        <select
+                          value={selectedIssueCompany || activeComp?.name || ""}
+                          onChange={(e) => {
+                            const newCompName = e.target.value;
+                            setSelectedIssueCompany(newCompName);
+                            const foundComp = targetCompanies.find((c) => c.name === newCompName);
+                            const cStock = foundComp ? (Number(foundComp.stock) || 0) : 0;
+                            if (cStock > 0 && cStock < remainingNeeded) {
+                              setIssueQuantity(String(cStock));
+                            }
+                          }}
+                          style={{
+                            padding: "9px 12px",
+                            borderRadius: "8px",
+                            border: "1.5px solid #059669",
+                            background: "#ffffff",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            color: "var(--text-primary)",
+                            cursor: "pointer",
+                            width: "100%",
+                          }}
+                        >
+                          {targetCompanies.map((c) => (
+                            <option key={c.name} value={c.name}>
+                              🏢 {c.name} — Available Stock: {c.stock ?? 0} {unit}
+                            </option>
+                          ))}
+                        </select>
+                        <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--text-muted)" }}>
+                          Deducts inventory stock specifically for selected company.
+                        </p>
+                      </div>
+                    ) : targetCompanies.length === 1 ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "8px 12px",
+                          background: "#ffffff",
+                          border: "1px solid var(--border-default)",
+                          borderRadius: "6px",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>
+                          🏢 {targetCompanies[0].name}
+                        </span>
+                        <span style={{ fontWeight: 600, color: (targetCompanies[0].stock || 0) > 0 ? "#059669" : "#dc2626" }}>
+                          Available Stock: {targetCompanies[0].stock ?? 0} {unit}
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: "12px", color: "#64748b", fontStyle: "italic" }}>
+                        No specific company configured for this item in inventory.
+                      </div>
+                    )}
+                  </div>
+
                   {/* Warehouse Live Stock & Shortage Alert */}
                   <div
                     style={{
@@ -1229,22 +1339,21 @@ export default function VendorRequestsPage() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: isStockShortage ? "#92400e" : "#065f46" }}>
-                          Warehouse Stock Level
+                          {activeComp ? `${activeComp.name} Stock Level` : "Warehouse Stock Level"}
                         </span>
                         <div style={{ fontSize: "15px", fontWeight: 800, color: isStockShortage ? "#b45309" : "#047857", marginTop: "2px" }}>
-                          Available in Warehouse: {availableStock} {unit}
+                          Available from {activeComp ? activeComp.name : "Warehouse"}: {availableStock} {unit}
+                          {targetCompanies.length > 1 && (
+                            <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-muted)", marginLeft: "6px" }}>
+                              (Total warehouse: {stockItem?.availableStock || 0} {unit})
+                            </span>
+                          )}
                         </div>
                       </div>
                       <Badge variant={isStockShortage ? "warning" : "success"}>
-                        {isStockShortage ? `Shortage: -${remainingNeeded - Math.max(0, availableStock)} ${unit}` : "Stock Ready"}
+                        {isStockShortage ? "Shortage" : "Stock Ready"}
                       </Badge>
                     </div>
-                    {isStockShortage && (
-                      <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#92400e", lineHeight: 1.4 }}>
-                        Warehouse has only <strong>{availableStock} {unit}</strong> available for this request of <strong>{remainingNeeded} {unit}</strong>.
-                        Enter the quantity you want to issue below.
-                      </p>
-                    )}
                   </div>
 
                   {/* Input: Quantity to Issue */}
@@ -1381,42 +1490,6 @@ export default function VendorRequestsPage() {
                       </div>
                     )}
                   </div>
-
-                  {/* Procure Shortage Link if Partial Issue */}
-                  {resultingRemaining > 0 && (
-                    <div
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: "8px",
-                        background: "rgba(59, 130, 246, 0.08)",
-                        border: "1px dashed #3b82f6",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                        Need to procure the remaining shortage of <strong>{resultingRemaining} {unit}</strong>?
-                      </div>
-                      <Link
-                        href={`/purchases/new?material=${encodeURIComponent(req.materialName)}&qty=${resultingRemaining}&unit=${encodeURIComponent(unit)}&location=${encodeURIComponent(req.siteName || "Central Warehouse")}`}
-                        className="btn btn-sm"
-                        style={{
-                          background: "#2563eb",
-                          color: "#fff",
-                          textDecoration: "none",
-                          padding: "5px 10px",
-                          fontSize: "11.5px",
-                          fontWeight: 700,
-                          borderRadius: "6px",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        📦 Procure Shortage ↗
-                      </Link>
-                    </div>
-                  )}
 
                   {/* Dispatch Voucher / Challan No & Remarks */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>

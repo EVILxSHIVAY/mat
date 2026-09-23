@@ -10,6 +10,7 @@ import {
   setStorageData,
   STORAGE_KEYS,
   getMasterMaterialCatalog,
+  inferUnit,
 } from "@/lib/dataService";
 import "./vendor.css";
 
@@ -122,7 +123,7 @@ export default function VendorDashboardPage() {
       siteName: newReq.siteName || "Main Site",
       materialName: newReq.materialName,
       quantityNeeded: Number(newReq.quantityNeeded) || 1,
-      unit: (newReq.unit === "Meter" || newReq.materialName.toLowerCase().includes("pipe")) ? "Meter" : "Pcs",
+      unit: inferUnit(newReq.materialName),
       priority: newReq.priority,
       status: "Pending Approval",
       createdAt: "Today · " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -354,7 +355,9 @@ export default function VendorDashboardPage() {
                     <div style={{ marginTop: "8px", background: "var(--card)", padding: "8px 10px", borderRadius: "6px" }}>
                       {iss.materials.map((m, mIdx) => (
                         <div key={mIdx} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", padding: "2px 0" }}>
-                          <span style={{ color: "var(--foreground)" }}>{m.name}</span>
+                          <span style={{ color: "var(--foreground)" }}>
+                            {m.name}{m.company ? ` (🏢 ${m.company})` : ""}
+                          </span>
                           <strong style={{ color: "#059669" }}>{m.quantity} {m.unit}</strong>
                         </div>
                       ))}
@@ -391,7 +394,7 @@ export default function VendorDashboardPage() {
                     onChange={(e) => {
                       const val = e.target.value;
                       const found = catalog.find((c) => c.name.toLowerCase() === val.toLowerCase());
-                      const inferred = (found?.unit === "Meter" || val.toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
+                      const inferred = found?.unit || inferUnit(val);
                       setNewReq({
                         ...newReq,
                         materialName: val,

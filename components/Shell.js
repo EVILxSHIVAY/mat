@@ -14,18 +14,15 @@ const adminNavigationSections = [
     items: [
       { href: "/", label: "Dashboard", icon: "⌂" },
       { href: "/inventory", label: "Inventory", icon: "📦" },
-      { href: "/purchases", label: "Purchases (Suppliers)", icon: "▣" },
+      { href: "/purchases", label: "Purchases", icon: "▣" },
       { href: "/material-requests", label: "Vendor Requests", icon: "📋" },
-      { href: "/material-issue", label: "Issue to Vendors", icon: "↗" },
       { href: "/material-consumption", label: "Site Consumption", icon: "◔" },
-      { href: "/returns", label: "Returns", icon: "🔄" },
     ],
   },
   {
     title: "DIRECTORIES",
     items: [
       { href: "/vendors", label: "Vendors & Sites", icon: "👷" },
-      { href: "/suppliers", label: "Suppliers", icon: "♙" },
       { href: "/party-ledger", label: "Party Ledger", icon: "⚖" },
       { href: "/products", label: "Products Catalog", icon: "▦" },
       { href: "/upload", label: "Upload Vault", icon: "⇧" },
@@ -318,7 +315,7 @@ export default function Shell({ children }) {
               aria-label="Global search (Ctrl+K)"
             >
               <span>🔍</span>
-              <span className="searchPrompt">Search stock, suppliers, PI#, vouchers...</span>
+              <span className="searchPrompt">Search stock, vendors, PI#, vouchers...</span>
               <kbd className="searchKbd">Ctrl K</kbd>
             </button>
           )}

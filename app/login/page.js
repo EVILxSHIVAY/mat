@@ -17,7 +17,7 @@ function LoginFormContent() {
   const [mobileStep, setMobileStep] = useState("intro");
 
   // Form State
-  const [role, setRole] = useState("ADMIN"); // 'ADMIN' | 'SUPPLIER' | 'VENDOR'
+  const [role, setRole] = useState("ADMIN"); // 'ADMIN' | 'VENDOR'
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -55,18 +55,14 @@ function LoginFormContent() {
       // Successful login -> Redirect based on role and return URL
       const loggedUser = result.user;
       let targetPath = "/";
-      if (loggedUser.role === "SUPPLIER") {
-        targetPath = "/supplier";
-      } else if (loggedUser.role === "VENDOR") {
+      if (loggedUser.role === "VENDOR") {
         targetPath = "/vendor";
       } else {
         targetPath = "/";
       }
 
       if (from && !from.startsWith("/login")) {
-        if (loggedUser.role === "SUPPLIER" && from.startsWith("/supplier")) {
-          targetPath = from;
-        } else if (loggedUser.role === "VENDOR" && from.startsWith("/vendor")) {
+        if (loggedUser.role === "VENDOR" && from.startsWith("/vendor")) {
           targetPath = from;
         } else if (loggedUser.role === "ADMIN") {
           targetPath = from;
@@ -87,24 +83,6 @@ function LoginFormContent() {
     if (targetRole === "ADMIN") {
       setEmail("admin@pdv.com");
       setPassword("Admin@PDV2026!");
-    } else if (targetRole === "SUPPLIER") {
-      let supEmail = "";
-      if (typeof window !== "undefined") {
-        try {
-          const raw = localStorage.getItem("pdv_app_suppliers");
-          const parsed = raw ? JSON.parse(raw) : [];
-          if (parsed.length > 0) {
-            const first = parsed[0];
-            supEmail = Array.isArray(first) ? first[4] : first.email || (first.code ? `${first.code.toLowerCase()}@pdv.com` : "");
-          }
-        } catch (e) {}
-      }
-      if (!supEmail) {
-        setErrorMessage("No suppliers registered in Admin Suppliers Directory yet. Please register a supplier in the Admin Panel first.");
-        return;
-      }
-      setEmail(supEmail);
-      setPassword("Supplier@2026!");
     } else {
       let vndEmail = "vendor@pdv.com";
       if (typeof window !== "undefined") {
@@ -115,7 +93,7 @@ function LoginFormContent() {
             const first = parsed[0];
             vndEmail = first.email || first.code || vndEmail;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
       setEmail(vndEmail);
       setPassword("Vendor@2026!");
@@ -146,12 +124,12 @@ function LoginFormContent() {
             </div>
 
             <h2 className="brandHeroHeading">
-              Manage materials, purchases, suppliers, and site operations from one secure workspace.
+              Manage materials, purchases, vendors, and site operations from one secure workspace.
             </h2>
 
             <p className="brandHeroSubtitle">
               Real-time inventory valuations, dispatch tracking, verified vendor consumption,
-              and dedicated supplier portals built for infrastructure projects.
+              and dedicated contractor portals built for infrastructure projects.
             </p>
 
             {/* Product Capabilities */}
@@ -173,10 +151,10 @@ function LoginFormContent() {
               </div>
 
               <div className="capabilityCard">
-                <div className="capabilityIconWrap">🏢</div>
+                <div className="capabilityIconWrap">👷</div>
                 <div className="capabilityTextGroup">
-                  <span className="capabilityTitle">Supplier Management</span>
-                  <span className="capabilityDesc">Verified supplier directory</span>
+                  <span className="capabilityTitle">Vendor Operations</span>
+                  <span className="capabilityDesc">Verified contractor directory</span>
                 </div>
               </div>
 
@@ -284,20 +262,6 @@ function LoginFormContent() {
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={role === "SUPPLIER"}
-                  className={`roleTabBtn ${role === "SUPPLIER" ? "active" : ""}`}
-                  onClick={() => {
-                    setRole("SUPPLIER");
-                    setErrorMessage("");
-                  }}
-                >
-                  <span className="roleTabIcon">🏢</span>
-                  <span>Supplier</span>
-                </button>
-
-                <button
-                  type="button"
-                  role="tab"
                   aria-selected={role === "VENDOR"}
                   className={`roleTabBtn ${role === "VENDOR" ? "active" : ""}`}
                   onClick={() => {
@@ -326,8 +290,6 @@ function LoginFormContent() {
                 <label className="fieldLabel" htmlFor="loginEmail">
                   {role === "ADMIN"
                     ? "Admin Email Address"
-                    : role === "SUPPLIER"
-                    ? "Registered Supplier Email"
                     : "Registered Vendor Email"}
                 </label>
                 <div className="inputWrapper">
@@ -340,8 +302,6 @@ function LoginFormContent() {
                     placeholder={
                       role === "ADMIN"
                         ? "Enter your admin email"
-                        : role === "SUPPLIER"
-                        ? "Enter your supplier email"
                         : "Enter your registered vendor email"
                     }
                     value={email}
@@ -407,8 +367,6 @@ function LoginFormContent() {
                   <span>
                     {role === "ADMIN"
                       ? "Sign in as Admin"
-                      : role === "SUPPLIER"
-                      ? "Sign in as Supplier"
                       : "Sign in as Vendor"}
                   </span>
                 )}
@@ -428,18 +386,6 @@ function LoginFormContent() {
                   type="button"
                   className="quickFillBtn"
                   onClick={() => handleQuickFill("ADMIN")}
-                >
-                  Auto-fill
-                </button>
-              </div>
-              <div className="demoRow">
-                <span>
-                  Supplier: <i>Registered suppliers from Admin Directory</i> / <code>Supplier@2026!</code>
-                </span>
-                <button
-                  type="button"
-                  className="quickFillBtn"
-                  onClick={() => handleQuickFill("SUPPLIER")}
                 >
                   Auto-fill
                 </button>

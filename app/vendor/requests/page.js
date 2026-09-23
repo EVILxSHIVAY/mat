@@ -11,6 +11,7 @@ import {
   setStorageData,
   STORAGE_KEYS,
   getMasterMaterialCatalog,
+  inferUnit,
 } from "@/lib/dataService";
 import { DEFAULT_VENDORS } from "@/data/defaultVendors";
 import "@/components/ui/ui.css";
@@ -111,7 +112,7 @@ export default function VendorRequestsPage() {
       siteName: newReq.siteName || "Main Site",
       materialName: newReq.materialName,
       quantityNeeded: Number(newReq.quantityNeeded) || 1,
-      unit: (newReq.unit === "Meter" || newReq.materialName.toLowerCase().includes("pipe")) ? "Meter" : "Pcs",
+      unit: inferUnit(newReq.materialName),
       priority: newReq.priority,
       status: "Pending Approval",
       createdAt: "Today · " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -367,7 +368,7 @@ export default function VendorRequestsPage() {
                     onChange={(e) => {
                       const val = e.target.value;
                       const found = catalog.find((c) => c.name.toLowerCase() === val.toLowerCase());
-                      const inferred = (found?.unit === "Meter" || val.toLowerCase().includes("pipe")) ? "Meter" : "Pcs";
+                      const inferred = found?.unit || inferUnit(val);
                       setNewReq({
                         ...newReq,
                         materialName: val,

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Shell from "@/components/Shell";
 import { Badge } from "@/components/ui/Badge";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getMasterMaterialCatalog, getStorageData, STORAGE_KEYS } from "@/lib/dataService";
+import { getMasterMaterialCatalog, getStorageData, STORAGE_KEYS, inferUnit } from "@/lib/dataService";
 import "../supplier.css";
 
 export default function SupplierMaterialsPage() {
@@ -34,11 +34,7 @@ export default function SupplierMaterialsPage() {
           code: Array.isArray(p) ? p[0] : p.code || `PRD-${idx + 1}`,
           name: Array.isArray(p) ? p[1] : p.name,
           category: (Array.isArray(p) ? p[3] : p.category) || "General Materials",
-          unit: (() => {
-            const rawU = Array.isArray(p) ? p[4] : p.unit;
-            if (rawU === "Meter" || rawU === "Pcs") return rawU;
-            return String(Array.isArray(p) ? p[1] : p.name).toLowerCase().includes("pipe") ? "Meter" : "Pcs";
-          })(),
+          unit: inferUnit(Array.isArray(p) ? p[1] : p.name),
           defaultRate: Number(Array.isArray(p) ? p[6] : p.rate) || 150,
           defaultLocation: (Array.isArray(p) ? p[11] : p.location) || "Central Warehouse",
         });

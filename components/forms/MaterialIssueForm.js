@@ -6,9 +6,8 @@ import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { fields } from "@/data/fields";
 import { DEFAULT_VENDORS } from "@/data/defaultVendors";
-import History from "./History";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
-import { calculateLiveInventory } from "@/lib/dataService";
+import { calculateLiveInventory, deductProductCompanyStock, inferUnit, isPipe } from "@/lib/dataService";
 import "@/components/ui/ui.css";
 import "./material-issue.css";
 
@@ -91,11 +90,7 @@ function categorizeMaterial(name) {
 }
 
 // Unit Classifier Helper (Restricted strictly to Meter for pipe and Pcs for everything else)
-function inferUnit(name) {
-  const n = String(name || "").toLowerCase();
-  if (n.includes("pipe")) return "Meter";
-  return "Pcs";
-}
+// Uses centralized logic from dataService
 
 const CATEGORIES = [
   "All",
@@ -239,6 +234,12 @@ export default function MaterialIssueForm() {
         }
 
         if (matParam) {
+          const invList = calculateLiveInventory();
+          const invRec = invList.find(
+            (inv) => inv.name && inv.name.toLowerCase().trim() === matParam.toLowerCase().trim()
+          );
+          const defaultComp = invRec?.companies?.[0]?.name || invRec?.company || "";
+
           setSelectedMaterials((prev) => {
             if (prev.some((m) => m.name.toLowerCase() === matParam.toLowerCase())) {
               return prev;
@@ -250,6 +251,7 @@ export default function MaterialIssueForm() {
                 category: categorizeMaterial(matParam),
                 unit: unitParam || inferUnit(matParam),
                 qty: Number(qtyParam) || 1,
+                company: defaultComp,
               },
               ...prev,
             ];
@@ -352,13 +354,19 @@ export default function MaterialIssueForm() {
       setSelectedMaterials(updated);
       focusQtyInput(material.name);
     } else {
-      // Add new row with default qty 1
+      const invRecord = liveInventory.find(
+        (inv) => inv.name && inv.name.toLowerCase().trim() === material.name.toLowerCase().trim()
+      );
+      const defaultCompany = invRecord?.companies?.[0]?.name || invRecord?.company || "";
+
+      // Add new row with default qty 1 and company
       const newEntry = {
         id: material.id || `mat-${Date.now()}`,
         name: material.name,
         category: material.category,
         unit: material.unit,
         qty: 1,
+        company: defaultCompany,
       };
       setSelectedMaterials((prev) => [newEntry, ...prev]);
 
@@ -401,6 +409,18 @@ export default function MaterialIssueForm() {
       prev.map((item) => {
         if (item.name === name) {
           return { ...item, qty: newQty };
+        }
+        return item;
+      })
+    );
+  };
+
+  // Update Company for Selected Material
+  const handleCompanyChange = (name, newCompany) => {
+    setSelectedMaterials((prev) =>
+      prev.map((item) => {
+        if (item.name === name) {
+          return { ...item, company: newCompany };
         }
         return item;
       })
@@ -482,12 +502,13 @@ export default function MaterialIssueForm() {
         department: voucherDetails.issuedTo || "Main Site",
         itemsCount: totalSelectedCount,
         status: voucherDetails.issueType || "Issued",
-        // Extended material details for full fidelity
+        // Extended material details for full fidelity including company
         materials: selectedMaterials.map((m) => ({
           name: m.name,
           quantity: Number(m.qty),
           unit: m.unit,
           category: m.category,
+          company: m.company || "",
         })),
         items: selectedMaterials.map((m) => ({
           name: m.name,
@@ -495,6 +516,7 @@ export default function MaterialIssueForm() {
           quantity: Number(m.qty),
           unit: m.unit,
           category: m.category,
+          company: m.company || "",
         })),
         createdAt: new Date().toISOString(),
       };
@@ -505,6 +527,15 @@ export default function MaterialIssueForm() {
       const existingList = existingRaw ? JSON.parse(existingRaw) : [];
       const updatedList = [newRecord, ...existingList];
       localStorage.setItem(storageKey, JSON.stringify(updatedList));
+
+      // Deduct inventory stock for each company
+      selectedMaterials.forEach((m) => {
+        try {
+          deductProductCompanyStock(m.name, m.company, Number(m.qty) || 0);
+        } catch (err) {
+          console.warn(`Could not deduct stock for ${m.name}:`, err);
+        }
+      });
 
       // If linked to a Vendor Material Request, update issued progress and status
       if (voucherDetails.reqId) {
@@ -706,7 +737,7 @@ export default function MaterialIssueForm() {
               />
             </div>
 
-            {/* Issue / Return Type */}
+            {/* Transaction Type */}
             <div className="fieldGroup">
               <label>Transaction Type</label>
               <select
@@ -716,7 +747,6 @@ export default function MaterialIssueForm() {
                 }
               >
                 <option value="Issue">Issue (Outward)</option>
-                <option value="Return">Return (Inward)</option>
               </select>
             </div>
 
@@ -892,6 +922,20 @@ export default function MaterialIssueForm() {
                         <div className="searchResultMeta">
                           <span className="categoryTag">{item.category}</span>
                           <span>Unit: <strong>{item.unit}</strong></span>
+                          {(() => {
+                            const invRec = liveInventory.find(
+                              (inv) => inv.name && inv.name.toLowerCase().trim() === item.name.toLowerCase().trim()
+                            );
+                            const comps = (invRec?.companies && invRec.companies.length > 0)
+                              ? invRec.companies
+                              : (invRec?.company ? [{ name: invRec.company, stock: invRec.availableStock || 0 }] : []);
+                            if (comps.length === 0) return null;
+                            return (
+                              <span style={{ fontSize: "11px", color: "#047857", background: "#ecfdf5", padding: "1px 6px", borderRadius: "4px", fontWeight: 600 }}>
+                                🏢 {comps.map((c) => c.name).join(", ")}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -964,6 +1008,7 @@ export default function MaterialIssueForm() {
                     <th className="itemIndexCol">#</th>
                     <th className="itemDescCol">Material Description & Specification</th>
                     <th>Category</th>
+                    <th style={{ minWidth: "160px" }}>Company / Stock</th>
                     <th className="qtyCol">Issue Quantity</th>
                     <th className="unitCol">Unit</th>
                     <th className="actionCol">Action</th>
@@ -971,9 +1016,17 @@ export default function MaterialIssueForm() {
                 </thead>
                 <tbody>
                   {selectedMaterials.map((item, index) => {
+                    const invRec = liveInventory.find(
+                      (inv) => inv.name && inv.name.toLowerCase().trim() === item.name.toLowerCase().trim()
+                    );
+                    const companies = (invRec?.companies && invRec.companies.length > 0)
+                      ? invRec.companies
+                      : (invRec?.company ? [{ name: invRec.company, stock: invRec.availableStock || 0 }] : []);
+                    const currentCompany = companies.find((c) => c.name === item.company) || companies[0];
+                    const effectiveStock = currentCompany ? (Number(currentCompany.stock) || 0) : getStockForItem(item.name);
                     const stockAvail = getStockForItem(item.name);
                     const qtyNum = Number(item.qty) || 0;
-                    const shortage = Math.max(0, qtyNum - stockAvail);
+                    const shortage = Math.max(0, qtyNum - effectiveStock);
 
                     return (
                       <tr key={item.name}>
@@ -981,8 +1034,8 @@ export default function MaterialIssueForm() {
                         <td className="itemDescCol">
                           <div className="itemNameText">{item.name}</div>
                           <div className="itemMetaRow" style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "11px", color: stockAvail > 0 ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
-                              Warehouse Stock: {stockAvail} {item.unit}
+                            <span style={{ fontSize: "11px", color: effectiveStock > 0 ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
+                              {currentCompany ? `${currentCompany.name} Stock: ${effectiveStock}` : `Warehouse Stock: ${stockAvail}`} {item.unit}
                             </span>
                             {shortage > 0 && (
                               <span style={{
@@ -1000,6 +1053,46 @@ export default function MaterialIssueForm() {
                         </td>
                         <td>
                           <span className="categoryTag">{item.category}</span>
+                        </td>
+                        <td style={{ verticalAlign: "middle" }}>
+                          {companies.length > 1 ? (
+                            <select
+                              value={item.company || companies[0]?.name || ""}
+                              onChange={(e) => handleCompanyChange(item.name, e.target.value)}
+                              style={{
+                                padding: "6px 8px",
+                                borderRadius: "6px",
+                                border: "1.5px solid #cbd5e1",
+                                background: "var(--surface-card, #fff)",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                width: "100%",
+                                maxWidth: "180px",
+                                color: "var(--text-primary, #0f172a)",
+                              }}
+                              title="Select which company's stock to issue from"
+                            >
+                              {companies.map((c) => (
+                                <option key={c.name} value={c.name}>
+                                  {c.name} (Stock: {c.stock ?? 0})
+                                </option>
+                              ))}
+                            </select>
+                          ) : companies.length === 1 ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                              <span style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--text-primary, #0f172a)" }}>
+                                🏢 {companies[0].name}
+                              </span>
+                              <span style={{ fontSize: "11px", fontWeight: 600, color: (companies[0].stock ?? 0) > 0 ? "#16a34a" : "#dc2626" }}>
+                                Stock: {companies[0].stock ?? 0} {item.unit}
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: "11.5px", color: "#94a3b8", fontStyle: "italic" }}>
+                              No company assigned
+                            </span>
+                          )}
                         </td>
                         <td className="qtyCol">
                           <div className="qtyControlGroup">
@@ -1028,10 +1121,10 @@ export default function MaterialIssueForm() {
                               +
                             </button>
                           </div>
-                          {shortage > 0 && stockAvail > 0 && (
+                          {shortage > 0 && effectiveStock > 0 && (
                             <button
                               type="button"
-                              onClick={() => handleQtyChange(item.name, stockAvail)}
+                              onClick={() => handleQtyChange(item.name, effectiveStock)}
                               style={{
                                 marginTop: "4px",
                                 fontSize: "10px",
@@ -1046,9 +1139,9 @@ export default function MaterialIssueForm() {
                                 width: "100%",
                                 textAlign: "center"
                               }}
-                              title="Set quantity to maximum available stock in warehouse"
+                              title="Set quantity to maximum available stock in company"
                             >
-                              ⚡ Issue Available ({stockAvail})
+                              ⚡ Issue Available ({effectiveStock})
                             </button>
                           )}
                         </td>
@@ -1196,6 +1289,7 @@ export default function MaterialIssueForm() {
                     <th className="itemIndexCol">#</th>
                     <th className="itemDescCol">Material Name</th>
                     <th>Category</th>
+                    <th style={{ minWidth: "150px" }}>Company / Stock</th>
                     <th className="unitCol">Unit</th>
                     <th style={{ width: "140px", textAlign: "right" }}>Issue Qty</th>
                   </tr>
@@ -1204,6 +1298,13 @@ export default function MaterialIssueForm() {
                   {modalCatalogFiltered.map((mat, idx) => {
                     const currentSelected = selectedMaterials.find((m) => m.name === mat.name);
                     const qtyVal = currentSelected ? currentSelected.qty : "";
+                    const invRec = liveInventory.find(
+                      (inv) => inv.name && inv.name.toLowerCase().trim() === mat.name.toLowerCase().trim()
+                    );
+                    const comps = (invRec?.companies && invRec.companies.length > 0)
+                      ? invRec.companies
+                      : (invRec?.company ? [{ name: invRec.company, stock: invRec.availableStock || 0 }] : []);
+                    const defaultComp = comps[0]?.name || "";
 
                     return (
                       <tr key={mat.id}>
@@ -1213,6 +1314,20 @@ export default function MaterialIssueForm() {
                         </td>
                         <td>
                           <span className="categoryTag">{mat.category}</span>
+                        </td>
+                        <td>
+                          {comps.length > 0 ? (
+                            <div style={{ fontSize: "12px" }}>
+                              <div style={{ fontWeight: 600, color: "#1e293b" }}>
+                                🏢 {comps.map((c) => c.name).join(", ")}
+                              </div>
+                              <div style={{ fontSize: "11px", color: (invRec?.availableStock || 0) > 0 ? "#16a34a" : "#dc2626", fontWeight: 500 }}>
+                                Avail: {invRec?.availableStock || 0} {mat.unit}
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: "11px", color: "#94a3b8" }}>—</span>
+                          )}
                         </td>
                         <td className="unitCol">{mat.unit}</td>
                         <td style={{ textAlign: "right" }}>
@@ -1236,6 +1351,7 @@ export default function MaterialIssueForm() {
                                       category: mat.category,
                                       unit: mat.unit,
                                       qty: val,
+                                      company: defaultComp,
                                     },
                                     ...prev,
                                   ]);

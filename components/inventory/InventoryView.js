@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";
@@ -37,6 +37,38 @@ export default function InventoryView({ initialFilter = "" }) {
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [adjustingProduct, setAdjustingProduct] = useState(null);
   const [adjustingCompany, setAdjustingCompany] = useState("");
+
+  // Filter Popover state & ref
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterRef = useRef(null);
+
+  // Close filter dropdown on outside click or Esc key
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (filterRef.current && !filterRef.current.contains(event.target)) {
+        setIsFilterOpen(false);
+      }
+    }
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsFilterOpen(false);
+      }
+    }
+    if (isFilterOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFilterOpen]);
+
+  const activeFilterCount =
+    (selectedCategory !== "All Categories" ? 1 : 0) +
+    (selectedStatus !== "All Statuses" ? 1 : 0);
 
   const refreshInventory = () => {
     const fresh = calculateLiveInventory();
@@ -143,27 +175,24 @@ export default function InventoryView({ initialFilter = "" }) {
     },
   ];
 
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-
   return (
     <Shell>
       <Title
         title="Inventory Master"
         desc="Live calculated physical stock derived from purchases, dispatches, and site movements."
         action={
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", width: "100%" }}>
-            <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={handleExport}>
+          <>
+            <button type="button" className="btn btn-secondary" onClick={handleExport}>
               ⤓ Export Stock
             </button>
             <button
               type="button"
               className="btn btn-primary"
-              style={{ flex: 1, whiteSpace: "nowrap" }}
               onClick={() => handleOpenAdjustModal(null)}
             >
               + Add Quantity
             </button>
-          </div>
+          </>
         }
       />
 
@@ -189,8 +218,8 @@ export default function InventoryView({ initialFilter = "" }) {
 
       {/* 2. Filter & Search Bar */}
       <section className="card tableCard">
-        <div className="tableControls">
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", width: "100%" }}>
+        <div className="tableControls invTableControls">
+          <div className="invSearchFilterRow">
             <div className="invSearchBox">
               <span>🔍</span>
               <input
@@ -200,26 +229,208 @@ export default function InventoryView({ initialFilter = "" }) {
                 onChange={(e) => setSearch(e.target.value)}
               />
               {search && (
-                <button type="button" className="clearBtn" onClick={() => setSearch("")}>
+                <button
+                  type="button"
+                  className="clearBtn"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                >
                   ×
                 </button>
               )}
             </div>
 
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ minHeight: "42px", padding: "0 12px", whiteSpace: "nowrap" }}
-              onClick={() => setIsFilterOpen(true)}
-            >
-              Filter ▾ {(selectedCategory !== "All Categories" || selectedStatus !== "All Statuses") ? "(Active)" : ""}
-            </button>
+            {/* Filter Dropdown Popover */}
+            <div className="invFilterContainer" ref={filterRef}>
+              <button
+                type="button"
+                className={`invFilterTriggerBtn ${activeFilterCount > 0 ? "active" : ""} ${isFilterOpen ? "open" : ""}`}
+                onClick={() => setIsFilterOpen((prev) => !prev)}
+                aria-expanded={isFilterOpen}
+                aria-label="Filter inventory"
+              >
+                <svg
+                  className="filterIcon"
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+                <span className="invFilterLabelText">Filter</span>
+                {activeFilterCount > 0 && (
+                  <span className="invFilterBadge">{activeFilterCount}</span>
+                )}
+                <span className={`invFilterChevron ${isFilterOpen ? "rotate" : ""}`}>▾</span>
+              </button>
+
+              {isFilterOpen && (
+                <>
+                  <div
+                    className="invFilterBackdrop"
+                    onClick={() => setIsFilterOpen(false)}
+                    aria-hidden="true"
+                  />
+                  <div className="invFilterDropdown" role="dialog" aria-label="Filter inventory options">
+                    <div className="invFilterDropdownHeader">
+                    <div className="invFilterDropdownTitle">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                      </svg>
+                      <strong>Filter Inventory</strong>
+                    </div>
+                    {activeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        className="invFilterClearText"
+                        onClick={() => {
+                          setSelectedCategory("All Categories");
+                          setSelectedStatus("All Statuses");
+                        }}
+                      >
+                        Reset all
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="invFilterDropdownBody">
+                    {/* Category Filter */}
+                    <div className="invFilterGroup">
+                      <label className="invFilterGroupLabel">Category</label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="invFilterSelect"
+                      >
+                        {CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Stock Health Status */}
+                    <div className="invFilterGroup">
+                      <label className="invFilterGroupLabel">Stock Health Status</label>
+                      <div className="invStatusPills">
+                        {STATUS_FILTERS.map((s) => {
+                          const isSelected = selectedStatus === s;
+                          let dotColor = "";
+                          if (s === "Good") dotColor = "#10b981";
+                          if (s === "Low") dotColor = "#f59e0b";
+                          if (s === "Critical") dotColor = "#ef4444";
+
+                          return (
+                            <button
+                              key={s}
+                              type="button"
+                              className={`invStatusPill ${isSelected ? "selected" : ""}`}
+                              onClick={() => setSelectedStatus(s)}
+                            >
+                              {dotColor && (
+                                <span
+                                  className="statusDot"
+                                  style={{ backgroundColor: dotColor }}
+                                />
+                              )}
+                              <span>{s}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="invFilterDropdownFooter">
+                    <button
+                      type="button"
+                      className="btn btn-secondary invFilterFooterBtn"
+                      onClick={() => {
+                        setSelectedCategory("All Categories");
+                        setSelectedStatus("All Statuses");
+                        setIsFilterOpen(false);
+                      }}
+                    >
+                      Reset
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary invFilterFooterBtn"
+                      onClick={() => setIsFilterOpen(false)}
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            </div>
           </div>
 
           <div className="tableCountHint">
             Showing <strong>{filteredInventory.length}</strong> of <strong>{inventoryList.length}</strong> items
           </div>
         </div>
+
+        {/* Active Filter Chips Bar */}
+        {activeFilterCount > 0 && (
+          <div className="activeFilterChipsBar">
+            <span className="activeChipsLabel">Active:</span>
+            {selectedCategory !== "All Categories" && (
+              <span className="filterChip">
+                <span className="chipCategory">Category:</span>
+                <strong>{selectedCategory}</strong>
+                <button
+                  type="button"
+                  className="chipRemove"
+                  title="Remove category filter"
+                  onClick={() => setSelectedCategory("All Categories")}
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {selectedStatus !== "All Statuses" && (
+              <span className="filterChip">
+                <span className="chipCategory">Status:</span>
+                <strong>{selectedStatus}</strong>
+                <button
+                  type="button"
+                  className="chipRemove"
+                  title="Remove status filter"
+                  onClick={() => setSelectedStatus("All Statuses")}
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            <button
+              type="button"
+              className="chipClearAll"
+              onClick={() => {
+                setSelectedCategory("All Categories");
+                setSelectedStatus("All Statuses");
+              }}
+            >
+              Clear all
+            </button>
+          </div>
+        )}
 
         {/* 1. Mobile-First Data Cards (Zero Horizontal Scroll on <= 768px) */}
         <div className="mobileCardList">
@@ -487,72 +698,6 @@ export default function InventoryView({ initialFilter = "" }) {
           </table>
         </div>
       </section>
-
-      {/* Filter Bottom Sheet */}
-      <DetailDrawer
-        isOpen={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-        title="Filter Inventory"
-        subtitle="Filter material stock by category and health status"
-        footerActions={
-          <div style={{ display: "flex", gap: "8px", width: "100%" }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ flex: 1 }}
-              onClick={() => {
-                setSelectedCategory("All Categories");
-                setSelectedStatus("All Statuses");
-                setIsFilterOpen(false);
-              }}
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ flex: 1 }}
-              onClick={() => setIsFilterOpen(false)}
-            >
-              Apply Filter
-            </button>
-          </div>
-        }
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-            Category
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="invSelect"
-              style={{ width: "100%" }}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: 600 }}>
-            Stock Health Status
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="invSelect"
-              style={{ width: "100%" }}
-            >
-              {STATUS_FILTERS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </DetailDrawer>
 
       {/* 3. Product Detail Drawer */}
       <DetailDrawer

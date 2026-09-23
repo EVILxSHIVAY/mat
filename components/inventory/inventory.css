@@ -872,4 +872,428 @@
   border-top: 1px solid var(--border-default, #e2e8f0);
 }
 
+/* ==========================================================================
+   Inventory Master Redesigned Toolbar, Search & Filter Dropdown Popover
+   ========================================================================== */
+
+.invTableControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  gap: 12px;
+  background: var(--surface-subtle, #f8fafc);
+  border-bottom: 1px solid var(--border-default, #e2e8f0);
+  position: relative;
+}
+
+.invSearchFilterRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.invSearchFilterRow .invSearchBox {
+  min-width: 0 !important;
+  flex: 1 1 360px;
+  max-width: 480px;
+  background: #ffffff;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 9px;
+  transition: all 0.15s ease;
+  height: 42px;
+  min-height: 42px;
+}
+
+.invSearchFilterRow .invSearchBox:focus-within {
+  border-color: var(--primary-forest, #15803d);
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12);
+}
+
+/* Filter Popover Container & Trigger Button */
+.invFilterContainer {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.invFilterTriggerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  background: #ffffff;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.invFilterTriggerBtn:hover {
+  background: var(--bg-subtle, #f8fafc);
+  border-color: var(--border-strong, #94a3b8);
+}
+
+.invFilterTriggerBtn.open {
+  border-color: var(--primary-forest, #15803d);
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12);
+  background: #ffffff;
+}
+
+.invFilterTriggerBtn.active {
+  background: rgba(21, 128, 61, 0.08);
+  border-color: var(--primary-forest, #15803d);
+  color: var(--primary-forest, #15803d);
+  font-weight: 700;
+}
+
+.filterIcon {
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.invFilterBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-forest, #15803d);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9999px;
+  line-height: 1;
+}
+
+.invFilterChevron {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  transition: transform 0.2s ease;
+  margin-left: 2px;
+}
+
+.invFilterChevron.rotate {
+  transform: rotate(180deg);
+}
+
+/* Invisible Click-Outside Backdrop */
+.invFilterBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: transparent;
+}
+
+/* Filter Dropdown Popover */
+.invFilterDropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  background: #ffffff;
+  border: 1px solid var(--border-default, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  z-index: 100;
+  overflow: hidden;
+  animation: filterDropdownPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes filterDropdownPop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.invFilterDropdownHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-subtle, #f8fafc);
+  border-bottom: 1px solid var(--border-default, #e2e8f0);
+}
+
+.invFilterDropdownTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+.invFilterDropdownTitle svg {
+  color: var(--primary-forest, #15803d);
+}
+
+.invFilterClearText {
+  background: transparent;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.invFilterClearText:hover {
+  color: #dc2626;
+  text-decoration: underline;
+}
+
+.invFilterDropdownBody {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.invFilterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.invFilterGroupLabel {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-secondary, #475569);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.invFilterSelect {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #0f172a);
+  background: #ffffff;
+  border: 1.5px solid var(--border-default, #cbd5e1);
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.invFilterSelect:focus {
+  border-color: var(--primary-forest, #15803d);
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12);
+}
+
+/* Status Filter Pills */
+.invStatusPills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.invStatusPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+  background: var(--bg-subtle, #f8fafc);
+  border: 1px solid var(--border-default, #e2e8f0);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.invStatusPill:hover {
+  background: #f1f5f9;
+  border-color: var(--border-strong, #94a3b8);
+  color: var(--text-primary, #0f172a);
+}
+
+.invStatusPill.selected {
+  background: rgba(21, 128, 61, 0.1);
+  border-color: var(--primary-forest, #15803d);
+  color: var(--primary-forest, #15803d);
+  font-weight: 700;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.invFilterDropdownFooter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-subtle, #f8fafc);
+  border-top: 1px solid var(--border-default, #e2e8f0);
+}
+
+.invFilterFooterBtn {
+  flex: 1;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  min-height: 36px;
+  border-radius: 7px;
+}
+
+/* Active Filter Chips Bar */
+.activeFilterChipsBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 18px 12px;
+  background: var(--surface-subtle, #f8fafc);
+  border-bottom: 1px solid var(--border-default, #e2e8f0);
+}
+
+.activeChipsLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted, #64748b);
+  letter-spacing: 0.04em;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--text-primary, #1e293b);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.chipCategory {
+  color: var(--text-muted, #64748b);
+  font-size: 11px;
+}
+
+.chipRemove {
+  background: transparent;
+  border: none;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 2px;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.chipRemove:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.chipClearAll {
+  background: transparent;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  text-decoration: underline;
+  transition: color 0.15s ease;
+}
+
+.chipClearAll:hover {
+  color: #dc2626;
+}
+
+/* Mobile & Small Screen Refinements */
+@media (max-width: 640px) {
+  .invTableControls {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .invSearchFilterRow {
+    gap: 8px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .invSearchFilterRow .invSearchBox {
+    min-width: 0 !important;
+    width: 100% !important;
+    flex: 1 1 auto;
+    min-height: 42px;
+    height: 42px;
+    padding: 0 10px;
+  }
+
+  .invSearchFilterRow .invSearchBox input {
+    font-size: 13.5px !important;
+  }
+
+  .invFilterTriggerBtn {
+    height: 42px;
+    min-height: 42px;
+    padding: 0 10px;
+    font-size: 13px;
+    gap: 5px;
+  }
+
+  .invFilterDropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: auto;
+    width: min(320px, calc(100vw - 28px));
+    max-width: calc(100vw - 28px);
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
+    z-index: 100;
+  }
+
+  .activeFilterChipsBar {
+    padding: 6px 12px 10px;
+    gap: 6px;
+  }
+
+  .tableCountHint {
+    font-size: 11.5px;
+    padding-left: 2px;
+  }
+}
+
+
 

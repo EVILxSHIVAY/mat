@@ -1,4 +1,5 @@
 import { Outfit, Figtree } from "next/font/google";
+import { AuthProvider } from "@/lib/auth/AuthContext";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -24,8 +25,6 @@ export const metadata = {
     apple: "/icon.svg",
   },
 };
-
-import { AuthProvider } from "@/lib/auth/AuthContext";
 
 export default function RootLayout({ children }) {
   return (

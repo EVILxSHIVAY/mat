@@ -6,7 +6,7 @@ import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";
 import DetailDrawer from "@/components/ui/DetailDrawer";
 import { exportToExcel } from "@/lib/exportToExcel";
-import { calculateLiveInventory, updateProductStock, resetProductStock } from "@/lib/dataService";
+import { calculateLiveInventory } from "@/lib/dataService";
 import StockAdjustModal from "./StockAdjustModal";
 import "@/components/ui/ui.css";
 import "./inventory.css";

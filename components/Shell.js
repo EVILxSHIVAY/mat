@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
 import GlobalSearchModal from "@/components/ui/GlobalSearchModal";
 import "./shell.css";
@@ -60,7 +60,6 @@ const vendorNavigationSections = [
 
 export default function Shell({ children }) {
   const currentPath = usePathname();
-  const router = useRouter();
   const { user, isAuthenticated, isLoading, logout, quickSwitchRole } = useAuth();
 
   useEffect(() => {

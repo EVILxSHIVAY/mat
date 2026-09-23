@@ -5,7 +5,6 @@ import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { DEFAULT_VENDORS } from "@/data/defaultVendors";
 import "@/components/ui/ui.css";
 import "../vendor.css";
 

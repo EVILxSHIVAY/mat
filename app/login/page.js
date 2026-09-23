@@ -2,12 +2,11 @@
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
 import "./login.css";
 
 function LoginFormContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";

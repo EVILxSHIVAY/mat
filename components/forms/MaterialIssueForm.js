@@ -5,92 +5,15 @@ import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { fields } from "@/data/fields";
-import { DEFAULT_VENDORS } from "@/data/defaultVendors";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
-import { calculateLiveInventory, deductProductCompanyStock, inferUnit, isPipe } from "@/lib/dataService";
+import {
+  calculateLiveInventory,
+  deductProductCompanyStock,
+  inferUnit,
+  categorizeMaterial,
+} from "@/lib/dataService";
 import "@/components/ui/ui.css";
 import "./material-issue.css";
-
-// Category Classifier Helper
-function categorizeMaterial(name) {
-  const n = name.toLowerCase();
-  if (
-    n.includes("pipe") ||
-    n.includes("nipple") ||
-    n.includes("coupler") ||
-    n.includes("tee") ||
-    n.includes("elbow") ||
-    n.includes("reducer") ||
-    n.includes("socket") ||
-    n.includes("bushing") ||
-    n.includes("union") ||
-    n.includes("end cap") ||
-    n.includes("end cape") ||
-    n.includes("dead plug") ||
-    n.includes("anaconda") ||
-    n.includes("transition") ||
-    n.includes("mdpe")
-  ) {
-    return "Pipes & Fittings";
-  }
-  if (
-    n.includes("valve") ||
-    n.includes("gauge") ||
-    n.includes("guage") ||
-    n.includes("meter") ||
-    n.includes("regulator")
-  ) {
-    return "Valves & Meters";
-  }
-  if (
-    n.includes("drill") ||
-    n.includes("hammer") ||
-    n.includes("cutter") ||
-    n.includes("wrench") ||
-    n.includes("cutter") ||
-    n.includes("machine") ||
-    n.includes("excuzer") ||
-    n.includes("scrapper") ||
-    n.includes("vice") ||
-    n.includes("handel") ||
-    n.includes("collet") ||
-    n.includes("gutka") ||
-    n.includes("board") ||
-    n.includes("marker") ||
-    n.includes("allenkeys") ||
-    n.includes("pump") ||
-    n.includes("bit")
-  ) {
-    return "Tools & Equipment";
-  }
-  if (
-    n.includes("safety") ||
-    n.includes("jacket") ||
-    n.includes("helmet") ||
-    n.includes("boot") ||
-    n.includes("shooes") ||
-    n.includes("shoes") ||
-    n.includes("first aid") ||
-    n.includes("extinguisher") ||
-    n.includes("caution") ||
-    n.includes("cone")
-  ) {
-    return "Safety & PPE";
-  }
-  if (
-    n.includes("clamp") ||
-    n.includes("screw") ||
-    n.includes("gitti") ||
-    n.includes("topi") ||
-    n.includes("tape")
-  ) {
-    return "Fasteners & Hardware";
-  }
-  return "General Materials";
-}
-
-// Unit Classifier Helper (Restricted strictly to Meter for pipe and Pcs for everything else)
-// Uses centralized logic from dataService
 
 const CATEGORIES = [
   "All",

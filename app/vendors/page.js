@@ -11,7 +11,6 @@ import {
   getStorageData,
   setStorageData,
   STORAGE_KEYS,
-  DEFAULT_VENDORS,
 } from "@/lib/dataService";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import "@/components/ui/ui.css";

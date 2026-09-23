@@ -32,7 +32,6 @@ export default function ConsumptionForm() {
   // Material rows with entered consumed quantity: [{ name, unit, issuedQty, previouslyConsumed, balance, usedNow }]
   const [materialRows, setMaterialRows] = useState([]);
   const [message, setMessage] = useState("");
-  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const issues = getStorageData(STORAGE_KEYS.ISSUES, []);
@@ -155,7 +154,6 @@ export default function ConsumptionForm() {
     setMessage(
       `✓ Consumption ${consumptionNo} recorded for ${selectedIssue?.department}! Remaining site balances updated.`
     );
-    setReloadKey((prev) => prev + 1);
 
     // Refresh rows
     if (selectedIssue) {

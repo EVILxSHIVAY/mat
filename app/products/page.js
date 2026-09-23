@@ -8,7 +8,6 @@ import DetailDrawer from "@/components/ui/DetailDrawer";
 import { exportToExcel } from "@/lib/exportToExcel";
 import {
   calculateLiveInventory,
-  getMasterMaterialCatalog,
   getStorageData,
   setStorageData,
   STORAGE_KEYS,
@@ -40,7 +39,6 @@ export default function ProductsPage() {
 
   // Add / Edit Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState("add");
   const [formData, setFormData] = useState({
     code: "",
     name: "",
@@ -58,7 +56,6 @@ export default function ProductsPage() {
   }, []);
 
   const handleOpenAdd = () => {
-    setModalMode("add");
     setFormData({
       code: `PRD-${String(productsList.length + 1).padStart(3, "0")}`,
       name: "",

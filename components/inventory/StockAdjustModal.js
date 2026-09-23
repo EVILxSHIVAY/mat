@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { saveProductCompanyStock, inferUnit } from "@/lib/dataService";
+import Link from "next/link";
+import { saveProductCompanyStock, inferUnit, getStorageData, STORAGE_KEYS } from "@/lib/dataService";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 
 export default function StockAdjustModal({
@@ -18,10 +19,30 @@ export default function StockAdjustModal({
   const [quantity, setQuantity] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [suppliers, setSuppliers] = useState([]);
+
+  // Load suppliers directly from directory
+  const loadSuppliers = () => {
+    const sups = getStorageData(STORAGE_KEYS.SUPPLIERS, []);
+    setSuppliers(sups);
+  };
+
+  useEffect(() => {
+    loadSuppliers();
+    window.addEventListener("pdv_suppliers_updated", loadSuppliers);
+    window.addEventListener("storage", loadSuppliers);
+    window.addEventListener("focus", loadSuppliers);
+    return () => {
+      window.removeEventListener("pdv_suppliers_updated", loadSuppliers);
+      window.removeEventListener("storage", loadSuppliers);
+      window.removeEventListener("focus", loadSuppliers);
+    };
+  }, []);
 
   // Initialize modal state
   useEffect(() => {
     if (isOpen) {
+      loadSuppliers();
       lockScroll();
       const prod = initialProduct || (products.length > 0 ? products[0] : null);
       if (prod) {
@@ -72,7 +93,7 @@ export default function StockAdjustModal({
 
     const trimmedName = companyName.trim();
     if (!trimmedName) {
-      setFeedback({ type: "error", message: "Please enter a Company Name." });
+      setFeedback({ type: "error", message: "Please select a Supplier from the dropdown." });
       return;
     }
 
@@ -183,20 +204,65 @@ export default function StockAdjustModal({
             </div>
 
             <div className="formInputsGrid">
-              {/* 1. Company Name */}
+              {/* 1. Supplier Dropbox (Strictly populated from Suppliers Directory) */}
               <div className="formGroup">
-                <label className="formLabel" htmlFor="companyNameInput">
-                  Company Name <span className="req">*</span>
-                </label>
-                <input
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <label className="formLabel" htmlFor="companyNameInput" style={{ margin: 0 }}>
+                    Supplier <span className="req">*</span>
+                  </label>
+                  <Link
+                    href="/suppliers"
+                    target="_blank"
+                    style={{ fontSize: "11.5px", color: "var(--brand-600)", textDecoration: "none", fontWeight: 500 }}
+                  >
+                    + Add Supplier in Directory ↗
+                  </Link>
+                </div>
+
+                <select
                   id="companyNameInput"
-                  type="text"
                   className="formInput"
-                  placeholder="e.g. Jindal Steel & Power"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   required
-                />
+                >
+                  <option value="">
+                    {suppliers.length === 0
+                      ? "-- No suppliers in directory (click '+ Add Supplier' above) --"
+                      : "-- Select Supplier --"}
+                  </option>
+                  {suppliers.map((sup, idx) => {
+                    const sName = Array.isArray(sup) ? sup[1] : sup.name;
+                    const sCode = Array.isArray(sup) ? sup[0] : sup.code;
+                    return (
+                      <option key={sCode || idx} value={sName}>
+                        {sName} {sCode ? `(${sCode})` : ""}
+                      </option>
+                    );
+                  })}
+                  {companyName &&
+                    !suppliers.some(
+                      (s) =>
+                        (Array.isArray(s) ? s[1] : s.name)?.toLowerCase() ===
+                        companyName.toLowerCase()
+                    ) && (
+                      <option value={companyName}>{companyName}</option>
+                    )}
+                </select>
+
+                {suppliers.length === 0 && (
+                  <p style={{ margin: "5px 0 0", fontSize: "11.5px", color: "var(--amber-text)" }}>
+                    ⚠️ No suppliers found. Click{" "}
+                    <Link
+                      href="/suppliers"
+                      target="_blank"
+                      style={{ fontWeight: 600, color: "var(--brand-600)", textDecoration: "underline" }}
+                    >
+                      + Add Supplier in Directory
+                    </Link>{" "}
+                    to register suppliers first.
+                  </p>
+                )}
               </div>
 
               {/* 2. Rate (₹) */}

@@ -14,7 +14,6 @@ const adminNavigationSections = [
     items: [
       { href: "/", label: "Dashboard", icon: "⌂" },
       { href: "/inventory", label: "Inventory", icon: "📦" },
-      { href: "/purchases", label: "Purchases", icon: "▣" },
       { href: "/material-requests", label: "Vendor Requests", icon: "📋" },
       { href: "/material-consumption", label: "Site Consumption", icon: "◔" },
     ],
@@ -22,6 +21,7 @@ const adminNavigationSections = [
   {
     title: "DIRECTORIES",
     items: [
+      { href: "/suppliers", label: "Suppliers", icon: "🏢" },
       { href: "/vendors", label: "Vendors & Sites", icon: "👷" },
       { href: "/party-ledger", label: "Party Ledger", icon: "⚖" },
       { href: "/products", label: "Products Catalog", icon: "▦" },

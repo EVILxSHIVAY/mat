@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";
-import DetailDrawer from "@/components/ui/DetailDrawer";
 import { exportToExcel } from "@/lib/exportToExcel";
 import {
   getStorageData,
@@ -17,18 +15,8 @@ import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import "@/components/ui/ui.css";
 
 export default function SuppliersPage() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/");
-  }, [router]);
-
   const [suppliers, setSuppliers] = useState([]);
-  const [purchases, setPurchases] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [bills, setBills] = useState([]);
   const [search, setSearch] = useState("");
-  const [selectedSupplier, setSelectedSupplier] = useState(null);
-  const [drawerTab, setDrawerTab] = useState("overview");
 
   // Add / Edit Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,20 +33,8 @@ export default function SuppliersPage() {
   });
 
   useEffect(() => {
-    const saved = getStorageData(STORAGE_KEYS.SUPPLIERS, []);
+    const saved = getStorageData(STORAGE_KEYS.SUPPLIERS, DEFAULT_SUPPLIERS || []);
     setSuppliers(saved);
-    setPurchases(getStorageData(STORAGE_KEYS.PURCHASES, []));
-    setPayments(getStorageData(STORAGE_KEYS.PAYMENTS, []));
-    setBills(getStorageData(STORAGE_KEYS.BILLS, []));
-    if (saved.length > 0) {
-      try {
-        fetch("/api/auth/sync-accounts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ suppliers: saved }),
-        }).catch(() => {});
-      } catch (e) {}
-    }
   }, []);
 
   useEffect(() => {
@@ -73,6 +49,12 @@ export default function SuppliersPage() {
   const saveList = (list) => {
     setSuppliers(list);
     setStorageData(STORAGE_KEYS.SUPPLIERS, list);
+
+    // Notify any open components (like Inventory StockAdjustModal)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("pdv_suppliers_updated", { detail: list }));
+    }
+
     try {
       fetch("/api/auth/sync-accounts", {
         method: "POST",
@@ -84,6 +66,7 @@ export default function SuppliersPage() {
 
   const handleOpenAdd = () => {
     setModalMode("add");
+    setEditIndex(null);
     setFormData({
       code: `SUP-${String(suppliers.length + 1).padStart(3, "0")}`,
       name: "",
@@ -100,12 +83,12 @@ export default function SuppliersPage() {
     setModalMode("edit");
     setEditIndex(idx);
     setFormData({
-      code: Array.isArray(sup) ? sup[0] : sup.code,
-      name: Array.isArray(sup) ? sup[1] : sup.name,
-      contact: Array.isArray(sup) ? sup[2] : sup.contactPerson,
-      mobile: Array.isArray(sup) ? sup[3] : sup.mobile,
-      email: Array.isArray(sup) ? sup[4] : sup.email,
-      gst: Array.isArray(sup) ? sup[5] : sup.gst,
+      code: Array.isArray(sup) ? sup[0] : sup.code || "",
+      name: Array.isArray(sup) ? sup[1] : sup.name || "",
+      contact: Array.isArray(sup) ? sup[2] : sup.contactPerson || sup.contact || "",
+      mobile: Array.isArray(sup) ? sup[3] : sup.mobile || "",
+      email: Array.isArray(sup) ? sup[4] : sup.email || "",
+      gst: Array.isArray(sup) ? sup[5] : sup.gst || "",
       status: Array.isArray(sup) ? sup[6] : sup.status || "Active",
     });
     setIsModalOpen(true);
@@ -113,19 +96,20 @@ export default function SuppliersPage() {
 
   const handleSaveModal = (e) => {
     e.preventDefault();
-    if (!formData.name) {
-      alert("Supplier Name is required.");
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
+      alert("Supplier / Company Name is required.");
       return;
     }
 
     const row = [
-      formData.code,
-      formData.name,
-      formData.contact,
-      formData.mobile,
-      formData.email,
-      formData.gst,
-      formData.status,
+      formData.code.trim() || `SUP-${String(suppliers.length + 1).padStart(3, "0")}`,
+      trimmedName,
+      formData.contact.trim(),
+      formData.mobile.trim(),
+      formData.email.trim(),
+      formData.gst.trim(),
+      formData.status || "Active",
     ];
 
     if (modalMode === "add") {
@@ -134,70 +118,52 @@ export default function SuppliersPage() {
       const copy = [...suppliers];
       copy[editIndex] = row;
       saveList(copy);
-      if (selectedSupplier) {
-        setSelectedSupplier(row);
-      }
     }
     setIsModalOpen(false);
   };
 
   const handleDelete = (index) => {
-    if (confirm("Delete this supplier?")) {
+    const target = suppliers[index];
+    const targetName = Array.isArray(target) ? target[1] : target.name;
+    if (confirm(`Are you sure you want to delete supplier "${targetName}"?`)) {
       saveList(suppliers.filter((_, i) => i !== index));
-      setSelectedSupplier(null);
     }
   };
 
-  const filteredSuppliers = suppliers.filter((s) => {
-    const name = Array.isArray(s) ? s[1] : s.name;
-    const code = Array.isArray(s) ? s[0] : s.code;
-    const contact = Array.isArray(s) ? s[2] : s.contactPerson;
+  const filteredSuppliers = useMemo(() => {
+    return suppliers.filter((s) => {
+      const name = Array.isArray(s) ? s[1] : s.name;
+      const code = Array.isArray(s) ? s[0] : s.code;
+      const contact = Array.isArray(s) ? s[2] : s.contactPerson || s.contact;
+      const mobile = Array.isArray(s) ? s[3] : s.mobile;
+      const gst = Array.isArray(s) ? s[5] : s.gst;
 
-    return (
-      !search ||
-      String(name).toLowerCase().includes(search.toLowerCase()) ||
-      String(code).toLowerCase().includes(search.toLowerCase()) ||
-      String(contact).toLowerCase().includes(search.toLowerCase())
-    );
-  });
+      return (
+        !search ||
+        String(name || "").toLowerCase().includes(search.toLowerCase()) ||
+        String(code || "").toLowerCase().includes(search.toLowerCase()) ||
+        String(contact || "").toLowerCase().includes(search.toLowerCase()) ||
+        String(mobile || "").toLowerCase().includes(search.toLowerCase()) ||
+        String(gst || "").toLowerCase().includes(search.toLowerCase())
+      );
+    });
+  }, [suppliers, search]);
 
   const handleExport = () => {
-    const headers = ["Supplier Code", "Supplier Name", "Contact Person", "Mobile", "Email", "GSTIN", "Status"];
-    const rows = filteredSuppliers.map((s) => (Array.isArray(s) ? s : [s.code, s.name, s.contactPerson, s.mobile, s.email, s.gst, s.status]));
+    const headers = ["Supplier Code", "Supplier / Company Name", "Contact Person", "Mobile", "Email", "GSTIN", "Status"];
+    const rows = filteredSuppliers.map((s) =>
+      Array.isArray(s)
+        ? s
+        : [s.code, s.name, s.contactPerson || s.contact, s.mobile, s.email, s.gst, s.status]
+    );
     exportToExcel({ filename: "Suppliers_Directory", headers, rows });
   };
-
-  // Supplier-specific drilldowns
-  const supName = selectedSupplier ? (Array.isArray(selectedSupplier) ? selectedSupplier[1] : selectedSupplier.name) : "";
-  const supPurchases = purchases.filter((p) => {
-    const pSup = p.supplier || (Array.isArray(p) ? p[2] : "");
-    return pSup && supName && pSup.toLowerCase().includes(supName.toLowerCase());
-  });
-  const supPayments = payments.filter((p) => {
-    const pParty = p.partyName || "";
-    return pParty && supName && pParty.toLowerCase().includes(supName.toLowerCase());
-  });
-  const supBills = bills.filter((b) => {
-    const bSup = b.supplierName || "";
-    return bSup && supName && bSup.toLowerCase().includes(supName.toLowerCase());
-  });
-
-  const totalSupBilled = supPayments.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
-  const totalSupPaid = supPayments.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
-  const totalSupDue = Math.max(0, totalSupBilled - totalSupPaid);
-
-  const supplierTabs = [
-    { id: "overview", label: "Overview", icon: "🏢" },
-    { id: "purchases", label: "Purchases", icon: "▣", count: supPurchases.length },
-    { id: "payments", label: "Payments", icon: "⚖", count: supPayments.length },
-    { id: "documents", label: "Documents", icon: "🧾", count: supBills.length },
-  ];
 
   return (
     <Shell>
       <Title
         title="Suppliers Directory"
-        desc="Manage supplier contacts, procurement history, invoices, and payment ledger."
+        desc="Manage approved suppliers and vendor companies for inventory material sourcing."
         action={
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <button type="button" className="secondary" onClick={handleExport}>
@@ -213,7 +179,7 @@ export default function SuppliersPage() {
       {/* Table Card */}
       <section className="card tableCard">
         <div className="tableControls">
-          <div className="invSearchBox" style={{ maxWidth: "320px" }}>
+          <div className="invSearchBox" style={{ maxWidth: "340px" }}>
             <span>🔍</span>
             <input
               type="text"
@@ -221,6 +187,11 @@ export default function SuppliersPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            {search && (
+              <button type="button" className="clearBtn" onClick={() => setSearch("")}>
+                ×
+              </button>
+            )}
           </div>
 
           <span className="tableCountHint">
@@ -233,33 +204,37 @@ export default function SuppliersPage() {
           {filteredSuppliers.length === 0 ? (
             <div className="emptyTable">
               <p>No suppliers match your search.</p>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ marginTop: "8px" }}
-                onClick={() => setSearch("")}
-              >
-                Reset Search
-              </button>
+              {suppliers.length === 0 ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ marginTop: "10px" }}
+                  onClick={handleOpenAdd}
+                >
+                  + Add First Supplier
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ marginTop: "8px" }}
+                  onClick={() => setSearch("")}
+                >
+                  Reset Search
+                </button>
+              )}
             </div>
           ) : (
             filteredSuppliers.map((s, idx) => {
               const code = Array.isArray(s) ? s[0] : s.code;
               const name = Array.isArray(s) ? s[1] : s.name;
-              const contact = Array.isArray(s) ? s[2] : s.contactPerson;
+              const contact = Array.isArray(s) ? s[2] : s.contactPerson || s.contact;
               const mobile = Array.isArray(s) ? s[3] : s.mobile;
               const gst = Array.isArray(s) ? s[5] : s.gst;
               const stat = Array.isArray(s) ? s[6] : s.status || "Active";
 
               return (
-                <div
-                  key={idx}
-                  className="mobileDataCard"
-                  onClick={() => {
-                    setSelectedSupplier(s);
-                    setDrawerTab("overview");
-                  }}
-                >
+                <div key={idx} className="mobileDataCard">
                   <div className="mobileCardHeader">
                     <div className="mobileCardTitleArea">
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
@@ -267,7 +242,7 @@ export default function SuppliersPage() {
                       </div>
                       <h3 className="mobileCardTitle">{name}</h3>
                     </div>
-                    <Badge>{stat}</Badge>
+                    <Badge variant={stat === "Active" ? "active" : "pending"}>{stat}</Badge>
                   </div>
 
                   <div className="mobileCardBody">
@@ -285,27 +260,20 @@ export default function SuppliersPage() {
                     </div>
                   </div>
 
-                  <div className="mobileCardFooter">
+                  <div className="mobileCardFooter" style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
                     <button
                       type="button"
                       className="btn btn-sm btn-secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEdit(s, idx);
-                      }}
+                      onClick={() => handleOpenEdit(s, idx)}
                     >
                       ✎ Edit
                     </button>
                     <button
                       type="button"
-                      className="mobilePrimaryAction"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedSupplier(s);
-                        setDrawerTab("overview");
-                      }}
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleDelete(idx)}
                     >
-                      Inspect Ledger →
+                      ✕ Delete
                     </button>
                   </div>
                 </div>
@@ -314,75 +282,79 @@ export default function SuppliersPage() {
           )}
         </div>
 
+        {/* Desktop Table */}
         <div className="tableScroll">
           <table>
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Supplier Name</th>
+                <th style={{ width: "110px" }}>Code</th>
+                <th>Supplier / Company Name</th>
                 <th>Contact Person</th>
                 <th>Mobile Number</th>
+                <th>Email</th>
                 <th>GSTIN</th>
-                <th>Status</th>
-                <th>Action</th>
+                <th style={{ width: "90px" }}>Status</th>
+                <th style={{ width: "130px", textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredSuppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="emptyTable">
-                    <p>No suppliers match your search.</p>
+                  <td colSpan={8} className="emptyTable">
+                    <p style={{ margin: "12px 0" }}>No suppliers found.</p>
+                    {suppliers.length === 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleOpenAdd}
+                      >
+                        + Add First Supplier
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
                 filteredSuppliers.map((s, idx) => {
                   const code = Array.isArray(s) ? s[0] : s.code;
                   const name = Array.isArray(s) ? s[1] : s.name;
-                  const contact = Array.isArray(s) ? s[2] : s.contactPerson;
+                  const contact = Array.isArray(s) ? s[2] : s.contactPerson || s.contact;
                   const mobile = Array.isArray(s) ? s[3] : s.mobile;
+                  const email = Array.isArray(s) ? s[4] : s.email;
                   const gst = Array.isArray(s) ? s[5] : s.gst;
                   const stat = Array.isArray(s) ? s[6] : s.status || "Active";
 
                   return (
-                    <tr
-                      key={idx}
-                      onClick={() => {
-                        setSelectedSupplier(s);
-                        setDrawerTab("overview");
-                      }}
-                    >
+                    <tr key={idx}>
                       <td>
                         <code className="codeBadge">{code}</code>
                       </td>
                       <td>
-                        <strong>{name}</strong>
+                        <strong style={{ fontSize: "14px", color: "var(--text-main)" }}>{name}</strong>
                       </td>
                       <td>{contact || "—"}</td>
                       <td>{mobile || "—"}</td>
+                      <td>{email || "—"}</td>
                       <td>
-                        <small style={{ fontFamily: "monospace" }}>{gst || "—"}</small>
+                        <small style={{ fontFamily: "monospace", color: "var(--text-muted)" }}>{gst || "—"}</small>
                       </td>
                       <td>
-                        <Badge>{stat}</Badge>
+                        <Badge variant={stat === "Active" ? "active" : "pending"}>{stat}</Badge>
                       </td>
-                      <td>
-                        <div style={{ display: "flex", gap: "6px" }} onClick={(e) => e.stopPropagation()}>
+                      <td style={{ textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", gap: "6px" }}>
                           <button
                             type="button"
-                            className="actionBtn view"
-                            onClick={() => {
-                              setSelectedSupplier(s);
-                              setDrawerTab("overview");
-                            }}
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => handleOpenEdit(s, idx)}
                           >
-                            Inspect →
+                            ✎ Edit
                           </button>
                           <button
                             type="button"
-                            className="actionBtn edit"
-                            onClick={() => handleOpenEdit(s, idx)}
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDelete(idx)}
                           >
-                            Edit
+                            ✕
                           </button>
                         </div>
                       </td>
@@ -395,162 +367,10 @@ export default function SuppliersPage() {
         </div>
       </section>
 
-      {/* Supplier Profile Detail Drawer */}
-      <DetailDrawer
-        isOpen={Boolean(selectedSupplier)}
-        onClose={() => setSelectedSupplier(null)}
-        title={supName || "Supplier Profile"}
-        subtitle={`Code: ${Array.isArray(selectedSupplier) ? selectedSupplier[0] : selectedSupplier?.code}`}
-        badge={<Badge>{Array.isArray(selectedSupplier) ? selectedSupplier[6] : selectedSupplier?.status || "Active"}</Badge>}
-        tabs={supplierTabs}
-        activeTab={drawerTab}
-        onTabChange={setDrawerTab}
-        footerActions={
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => setSelectedSupplier(null)}
-          >
-            Close
-          </button>
-        }
-      >
-        {selectedSupplier && (
-          <div>
-            {/* Tab 1: Overview */}
-            {drawerTab === "overview" && (
-              <div>
-                <div className="drawerMetricGrid">
-                  <div className="drawerMetricCard">
-                    <span className="drawerMetricLabel">Total Invoiced</span>
-                    <strong className="drawerMetricVal">₹ {totalSupBilled.toLocaleString()}</strong>
-                  </div>
-                  <div className="drawerMetricCard">
-                    <span className="drawerMetricLabel">Amount Settled</span>
-                    <strong className="drawerMetricVal" style={{ color: "var(--green-text)" }}>
-                      ₹ {totalSupPaid.toLocaleString()}
-                    </strong>
-                  </div>
-                  <div className="drawerMetricCard">
-                    <span className="drawerMetricLabel">Outstanding Due</span>
-                    <strong className="drawerMetricVal" style={{ color: totalSupDue > 0 ? "var(--red-text)" : "inherit" }}>
-                      ₹ {totalSupDue.toLocaleString()}
-                    </strong>
-                  </div>
-                </div>
-
-                <h4 className="drawerSectionTitle">Contact Information</h4>
-                <div className="drawerKvList">
-                  <div className="drawerKvRow">
-                    <span className="drawerKvLabel">Contact Person:</span>
-                    <span className="drawerKvVal">{Array.isArray(selectedSupplier) ? selectedSupplier[2] : selectedSupplier.contactPerson || "—"}</span>
-                  </div>
-                  <div className="drawerKvRow">
-                    <span className="drawerKvLabel">Mobile Phone:</span>
-                    <span className="drawerKvVal">{Array.isArray(selectedSupplier) ? selectedSupplier[3] : selectedSupplier.mobile || "—"}</span>
-                  </div>
-                  <div className="drawerKvRow">
-                    <span className="drawerKvLabel">Email Address:</span>
-                    <span className="drawerKvVal">{Array.isArray(selectedSupplier) ? selectedSupplier[4] : selectedSupplier.email || "—"}</span>
-                  </div>
-                  <div className="drawerKvRow">
-                    <span className="drawerKvLabel">GSTIN Registration:</span>
-                    <span className="drawerKvVal" style={{ fontFamily: "monospace" }}>
-                      {Array.isArray(selectedSupplier) ? selectedSupplier[5] : selectedSupplier.gst || "—"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Tab 2: Purchases */}
-            {drawerTab === "purchases" && (
-              <div className="tableScroll">
-                <table>
-                  <thead>
-                    <tr><th>PI #</th><th>Date</th><th>Items</th><th>Amount</th><th>Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {supPurchases.length === 0 ? (
-                      <tr><td colSpan={5} className="emptyTable"><p>No purchases logged from this vendor yet.</p></td></tr>
-                    ) : (
-                      supPurchases.map((p, i) => (
-                        <tr key={i}>
-                          <td><strong>{p.piNumber || (Array.isArray(p) ? p[0] : "—")}</strong></td>
-                          <td>{p.piDate || (Array.isArray(p) ? p[1] : "—")}</td>
-                          <td>{p.itemsCount || 1} items</td>
-                          <td><strong>{p.totalAmount || (Array.isArray(p) ? p[5] : "—")}</strong></td>
-                          <td><Badge>{p.status || (Array.isArray(p) ? p[6] : "Approved")}</Badge></td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Tab 3: Payments */}
-            {drawerTab === "payments" && (
-              <div className="tableScroll">
-                <table>
-                  <thead>
-                    <tr><th>Invoice #</th><th>Billed</th><th>Paid</th><th>Balance</th><th>Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {supPayments.length === 0 ? (
-                      <tr><td colSpan={5} className="emptyTable"><p>No payment entries logged for this vendor.</p></td></tr>
-                    ) : (
-                      supPayments.map((pay, i) => (
-                        <tr key={i}>
-                          <td><strong>{pay.invoiceNo}</strong></td>
-                          <td>₹ {Number(pay.totalAmount).toLocaleString()}</td>
-                          <td style={{ color: "var(--green-text)", fontWeight: 700 }}>₹ {Number(pay.amountPaid).toLocaleString()}</td>
-                          <td style={{ color: pay.balanceLeft > 0 ? "var(--red-text)" : "inherit", fontWeight: 700 }}>₹ {Number(pay.balanceLeft).toLocaleString()}</td>
-                          <td><Badge>{pay.status}</Badge></td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Tab 4: Documents */}
-            {drawerTab === "documents" && (
-              <div className="tableScroll">
-                <table>
-                  <thead>
-                    <tr><th>Type</th><th>Bill #</th><th>Amount</th><th>File</th></tr>
-                  </thead>
-                  <tbody>
-                    {supBills.length === 0 ? (
-                      <tr><td colSpan={4} className="emptyTable"><p>No soft copies attached for this supplier.</p></td></tr>
-                    ) : (
-                      supBills.map((b) => (
-                        <tr key={b.id}>
-                          <td><Badge>{b.billType}</Badge></td>
-                          <td><strong>{b.billNumber}</strong></td>
-                          <td>{b.amount}</td>
-                          <td>
-                            <a href={b.fileData} download={b.fileName} style={{ color: "var(--brand-600)", fontWeight: 600 }}>
-                              📎 {b.fileName}
-                            </a>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-      </DetailDrawer>
-
       {/* Add / Edit Supplier Modal */}
       {isModalOpen && (
         <div className="modalBackdrop" onClick={() => setIsModalOpen(false)}>
-          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "520px" }}>
             <div className="modalHeader">
               <h3>{modalMode === "add" ? "Add New Supplier" : "Edit Supplier"}</h3>
               <button
@@ -558,7 +378,7 @@ export default function SuppliersPage() {
                 className="modalCloseBtn"
                 onClick={() => setIsModalOpen(false)}
               >
-                ×
+                ✕
               </button>
             </div>
             <form onSubmit={handleSaveModal}>
@@ -574,10 +394,11 @@ export default function SuppliersPage() {
                     />
                   </label>
                   <label>
-                    Supplier Name *
+                    Supplier / Company Name *
                     <input
                       type="text"
                       required
+                      placeholder="e.g. Jindal Steel, Tata Steel"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     />
@@ -589,6 +410,7 @@ export default function SuppliersPage() {
                     Contact Person
                     <input
                       type="text"
+                      placeholder="e.g. Rajesh Kumar"
                       value={formData.contact}
                       onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
                     />
@@ -597,6 +419,7 @@ export default function SuppliersPage() {
                     Mobile Phone
                     <input
                       type="tel"
+                      placeholder="e.g. 9876543210"
                       value={formData.mobile}
                       onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
                     />
@@ -608,6 +431,7 @@ export default function SuppliersPage() {
                     Email Address
                     <input
                       type="email"
+                      placeholder="supplier@example.com"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
@@ -645,7 +469,7 @@ export default function SuppliersPage() {
                   Cancel
                 </button>
                 <button type="submit" className="primary">
-                  Save Supplier
+                  {modalMode === "add" ? "+ Save Supplier" : "Update Supplier"}
                 </button>
               </div>
             </form>

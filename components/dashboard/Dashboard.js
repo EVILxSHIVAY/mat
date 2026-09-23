@@ -33,11 +33,8 @@ export default function Dashboard() {
           <Link href="/material-consumption" className="dashActionBtn">
             <span>◔ Consumption</span>
           </Link>
-          <Link href="/purchases" className="dashActionBtn">
-            <span>▣ Purchases / PI</span>
-          </Link>
-          <Link href="/purchases/new" className="dashActionBtn">
-            <span>+ New Purchase</span>
+          <Link href="/suppliers" className="dashActionBtn">
+            <span>🏢 Suppliers</span>
           </Link>
         </div>
       </div>
@@ -96,12 +93,12 @@ export default function Dashboard() {
       </div>
 
       {/* 3. "Needs Attention" List - Urgent Action Items First */}
-      {(metrics.lowStockCount > 0 || metrics.pendingRequestsCount > 0 || metrics.pendingPurchasesCount > 0) ? (
+      {(metrics.lowStockCount > 0 || metrics.pendingRequestsCount > 0) ? (
         <section className="card attentionCard animate-fade-in">
           <div className="attentionHead">
             <span className="attentionBadge">NEEDS ATTENTION</span>
             <span className="attentionCount">
-              {metrics.lowStockCount + (metrics.pendingRequestsCount || 0) + (metrics.pendingPurchasesCount || 0)} items requiring operational action
+              {metrics.lowStockCount + (metrics.pendingRequestsCount || 0)} items requiring operational action
             </span>
           </div>
 
@@ -136,23 +133,6 @@ export default function Dashboard() {
                 </div>
                 <Link href="/material-requests" className="btn btn-primary attentionActionBtn">
                   Review Requests
-                </Link>
-              </div>
-            )}
-
-            {metrics.pendingPurchasesCount > 0 && (
-              <div className="attentionRow">
-                <div className="attentionRowLeft">
-                  <span className="attentionDot yellow" />
-                  <div>
-                    <strong>{metrics.pendingPurchasesCount} inward purchases pending</strong>
-                    <p className="attentionSub">
-                      Vendor shipments awaiting delivery verification and inventory settlement.
-                    </p>
-                  </div>
-                </div>
-                <Link href="/purchases" className="btn btn-secondary attentionActionBtn">
-                  Review Purchases
                 </Link>
               </div>
             )}
@@ -285,11 +265,11 @@ export default function Dashboard() {
               </div>
             </Link>
 
-            <Link href="/purchases" className="opsCard">
-              <span className="opsIcon">▣</span>
+            <Link href="/suppliers" className="opsCard">
+              <span className="opsIcon">🏢</span>
               <div>
-                <b>Purchases / PI</b>
-                <small>Inward orders & bills</small>
+                <b>Suppliers</b>
+                <small>Directory for inventory materials</small>
               </div>
             </Link>
 

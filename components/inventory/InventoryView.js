@@ -12,7 +12,7 @@ import "@/components/ui/ui.css";
 import "./inventory.css";
 
 const CATEGORIES = [
-  "All Categories",
+  "All",
   "Pipes & Fittings",
   "Valves & Meters",
   "Tools & Equipment",
@@ -21,14 +21,40 @@ const CATEGORIES = [
   "General Materials",
 ];
 
-const STATUS_FILTERS = ["All Statuses", "Good", "Low", "Critical"];
+const STATUS_FILTERS = ["All", "Good", "Low", "Critical", "Out of Stock"];
+
+function getStockStatusMeta(status) {
+  const s = String(status || "").toLowerCase();
+  if (s.includes("good") || s === "in stock") {
+    return {
+      label: "In Stock",
+      dotClass: "green",
+      badgeClass: "inStock",
+      icon: "🟢",
+    };
+  }
+  if (s.includes("low")) {
+    return {
+      label: "Low Stock",
+      dotClass: "amber",
+      badgeClass: "lowStock",
+      icon: "🟡",
+    };
+  }
+  return {
+    label: "Out of Stock",
+    dotClass: "red",
+    badgeClass: "outStock",
+    icon: "🔴",
+  };
+}
 
 export default function InventoryView({ initialFilter = "" }) {
   const [inventoryList, setInventoryList] = useState(() => calculateLiveInventory());
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState(
-    initialFilter === "low" ? "Low" : "All Statuses"
+    initialFilter === "low" ? "Low" : "All"
   );
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [drawerTab, setDrawerTab] = useState("overview");
@@ -37,38 +63,6 @@ export default function InventoryView({ initialFilter = "" }) {
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [adjustingProduct, setAdjustingProduct] = useState(null);
   const [adjustingCompany, setAdjustingCompany] = useState("");
-
-  // Filter Popover state & ref
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const filterRef = useRef(null);
-
-  // Close filter dropdown on outside click or Esc key
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (filterRef.current && !filterRef.current.contains(event.target)) {
-        setIsFilterOpen(false);
-      }
-    }
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        setIsFilterOpen(false);
-      }
-    }
-    if (isFilterOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("touchstart", handleClickOutside);
-      document.addEventListener("keydown", handleKeyDown);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isFilterOpen]);
-
-  const activeFilterCount =
-    (selectedCategory !== "All Categories" ? 1 : 0) +
-    (selectedStatus !== "All Statuses" ? 1 : 0);
 
   const refreshInventory = () => {
     const fresh = calculateLiveInventory();
@@ -111,13 +105,21 @@ export default function InventoryView({ initialFilter = "" }) {
       const matchesSearch = !s || name.includes(s) || cat.includes(s) || comp.includes(s);
 
       const matchesCat =
-        selectedCategory === "All Categories" || item.category === selectedCategory;
+        selectedCategory === "All" ||
+        selectedCategory === "All Categories" ||
+        item.category === selectedCategory;
 
       const matchesStatus =
-        selectedStatus === "All Statuses"
+        selectedStatus === "All" || selectedStatus === "All Statuses"
           ? true
+          : selectedStatus === "Good"
+          ? item.status === "Good"
           : selectedStatus === "Low"
-          ? item.status === "Low" || item.status === "Critical"
+          ? item.status === "Low"
+          : selectedStatus === "Critical"
+          ? item.status === "Critical" || item.status === "Out of Stock"
+          : selectedStatus === "Out of Stock"
+          ? item.status === "Out of Stock" || item.status === "Critical"
           : item.status === selectedStatus;
 
       return matchesSearch && matchesCat && matchesStatus;
@@ -177,27 +179,70 @@ export default function InventoryView({ initialFilter = "" }) {
 
   return (
     <Shell>
-      <Title
-        title="Inventory Master"
-        desc="Live calculated physical stock derived from purchases, dispatches, and site movements."
-        action={
-          <>
-            <button type="button" className="btn btn-secondary" onClick={handleExport}>
-              ⤓ Export Stock
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => handleOpenAdjustModal(null)}
-            >
-              + Add Quantity
-            </button>
-          </>
-        }
-      />
+      {/* 1. Desktop Header Area (Hidden on <= 768px) */}
+      <div className="inventoryDesktopHeader">
+        <Title
+          title="Inventory Master"
+          desc="Live calculated physical stock derived from purchases, dispatches, and site movements."
+          action={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={handleExport}>
+                ⤓ Export Stock
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => handleOpenAdjustModal(null)}
+              >
+                + Add Quantity
+              </button>
+            </>
+          }
+        />
+      </div>
 
-      {/* 1. Inventory Metric Bar */}
-      <div className="inventorySummaryRow">
+      {/* 1b. Mobile Compact Header (Shown on <= 768px) */}
+      <div className="inventoryMobileHeader">
+        <div className="invMobHeaderTitleArea">
+          <h1 className="invMobTitle">Inventory</h1>
+          <span className="invMobCount">{inventoryList.length} materials</span>
+        </div>
+        <div className="invMobHeaderActions">
+          <button
+            type="button"
+            className="invMobExportBtn"
+            onClick={handleExport}
+            title="Export Stock to Excel"
+            aria-label="Export Stock"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>Export</span>
+          </button>
+          <button
+            type="button"
+            className="invMobAddBtn"
+            onClick={() => handleOpenAdjustModal(null)}
+          >
+            + Add Quantity
+          </button>
+        </div>
+      </div>
+
+      {/* 2a. Desktop Inventory Metric Bar (Hidden on <= 768px) */}
+      <div className="inventorySummaryRow inventoryDesktopSummary">
         <div className="invStatBox">
           <span className="invStatLabel">Total Catalog Items</span>
           <strong className="invStatVal">{inventoryList.length} Materials</strong>
@@ -216,15 +261,39 @@ export default function InventoryView({ initialFilter = "" }) {
         </div>
       </div>
 
-      {/* 2. Filter & Search Bar */}
-      <section className="card tableCard">
-        <div className="tableControls invTableControls">
-          <div className="invSearchFilterRow">
+      {/* 2b. Mobile Compact Summary Bar (Shown on <= 768px) */}
+      <div className="inventoryMobileSummary">
+        <div className="invMobSummaryItem">
+          <strong className="invMobSummaryVal">{inventoryList.length}</strong>
+          <span className="invMobSummaryLabel">Materials</span>
+        </div>
+        <div className="invMobSummaryDivider" />
+        <div className="invMobSummaryItem">
+          <strong className="invMobSummaryVal">{totalStockUnits.toLocaleString()}</strong>
+          <span className="invMobSummaryLabel">Units</span>
+        </div>
+        <div className="invMobSummaryDivider" />
+        <div className="invMobSummaryItem">
+          <strong className="invMobSummaryVal">₹{totalStockVal.toLocaleString()}</strong>
+          <span className="invMobSummaryLabel">Value</span>
+        </div>
+        <div className="invMobSummaryDivider" />
+        <div className={`invMobSummaryItem ${lowCount > 0 ? "warning" : ""}`}>
+          <strong className="invMobSummaryVal">{lowCount}</strong>
+          <span className="invMobSummaryLabel">Low Stock</span>
+        </div>
+      </div>
+
+      {/* 3. Search & Filter Bar - Clean Catalogue Toolbar */}
+      <section className="card tableCard invCatalogueSection">
+        <div className="invCatalogueToolbar">
+          {/* Row 1: Search Input & Results Count */}
+          <div className="invSearchRow">
             <div className="invSearchBox">
-              <span>🔍</span>
+              <span className="searchIcon">🔍</span>
               <input
                 type="text"
-                placeholder="Search material, category, or company..."
+                placeholder="Search materials..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -240,302 +309,191 @@ export default function InventoryView({ initialFilter = "" }) {
               )}
             </div>
 
-            {/* Filter Dropdown Popover */}
-            <div className="invFilterContainer" ref={filterRef}>
-              <button
-                type="button"
-                className={`invFilterTriggerBtn ${activeFilterCount > 0 ? "active" : ""} ${isFilterOpen ? "open" : ""}`}
-                onClick={() => setIsFilterOpen((prev) => !prev)}
-                aria-expanded={isFilterOpen}
-                aria-label="Filter inventory"
-              >
-                <svg
-                  className="filterIcon"
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                </svg>
-                <span className="invFilterLabelText">Filter</span>
-                {activeFilterCount > 0 && (
-                  <span className="invFilterBadge">{activeFilterCount}</span>
-                )}
-                <span className={`invFilterChevron ${isFilterOpen ? "rotate" : ""}`}>▾</span>
-              </button>
-
-              {isFilterOpen && (
-                <>
-                  <div
-                    className="invFilterBackdrop"
-                    onClick={() => setIsFilterOpen(false)}
-                    aria-hidden="true"
-                  />
-                  <div className="invFilterDropdown" role="dialog" aria-label="Filter inventory options">
-                    <div className="invFilterDropdownHeader">
-                    <div className="invFilterDropdownTitle">
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                      </svg>
-                      <strong>Filter Inventory</strong>
-                    </div>
-                    {activeFilterCount > 0 && (
-                      <button
-                        type="button"
-                        className="invFilterClearText"
-                        onClick={() => {
-                          setSelectedCategory("All Categories");
-                          setSelectedStatus("All Statuses");
-                        }}
-                      >
-                        Reset all
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="invFilterDropdownBody">
-                    {/* Category Filter */}
-                    <div className="invFilterGroup">
-                      <label className="invFilterGroupLabel">Category</label>
-                      <select
-                        value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="invFilterSelect"
-                      >
-                        {CATEGORIES.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Stock Health Status */}
-                    <div className="invFilterGroup">
-                      <label className="invFilterGroupLabel">Stock Health Status</label>
-                      <div className="invStatusPills">
-                        {STATUS_FILTERS.map((s) => {
-                          const isSelected = selectedStatus === s;
-                          let dotColor = "";
-                          if (s === "Good") dotColor = "#10b981";
-                          if (s === "Low") dotColor = "#f59e0b";
-                          if (s === "Critical") dotColor = "#ef4444";
-
-                          return (
-                            <button
-                              key={s}
-                              type="button"
-                              className={`invStatusPill ${isSelected ? "selected" : ""}`}
-                              onClick={() => setSelectedStatus(s)}
-                            >
-                              {dotColor && (
-                                <span
-                                  className="statusDot"
-                                  style={{ backgroundColor: dotColor }}
-                                />
-                              )}
-                              <span>{s}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="invFilterDropdownFooter">
-                    <button
-                      type="button"
-                      className="btn btn-secondary invFilterFooterBtn"
-                      onClick={() => {
-                        setSelectedCategory("All Categories");
-                        setSelectedStatus("All Statuses");
-                        setIsFilterOpen(false);
-                      }}
-                    >
-                      Reset
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary invFilterFooterBtn"
-                      onClick={() => setIsFilterOpen(false)}
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+            <div className="tableCountHint">
+              Showing <strong>{filteredInventory.length}</strong> of <strong>{inventoryList.length}</strong> items
             </div>
           </div>
 
-          <div className="tableCountHint">
-            Showing <strong>{filteredInventory.length}</strong> of <strong>{inventoryList.length}</strong> items
+          {/* Row 2: Category Filter Chips (Horizontally Scrollable) */}
+          <div className="invFilterStrip">
+            <span className="invFilterStripLabel">Category</span>
+            <div className="invChipsScroll" role="tablist" aria-label="Filter by Category">
+              {CATEGORIES.map((cat) => {
+                const isSelected =
+                  selectedCategory === cat ||
+                  (cat === "All" && (selectedCategory === "All Categories" || selectedCategory === "All"));
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    className={`invFilterChip ${isSelected ? "selected" : ""}`}
+                    onClick={() => setSelectedCategory(cat)}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Row 3: Stock Status Filter Chips (Horizontally Scrollable) */}
+          <div className="invFilterStrip statusStrip">
+            <span className="invFilterStripLabel">Status</span>
+            <div className="invChipsScroll" role="tablist" aria-label="Filter by Stock Status">
+              {STATUS_FILTERS.map((st) => {
+                const isSelected =
+                  selectedStatus === st ||
+                  (st === "All" && (selectedStatus === "All Statuses" || selectedStatus === "All"));
+                let dotColor = "";
+                let statusClass = "all";
+                if (st === "Good") {
+                  dotColor = "#10b981";
+                  statusClass = "good";
+                } else if (st === "Low") {
+                  dotColor = "#f59e0b";
+                  statusClass = "low";
+                } else if (st === "Critical" || st === "Out of Stock") {
+                  dotColor = "#ef4444";
+                  statusClass = "critical";
+                }
+
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    className={`invFilterChip statusChip ${statusClass} ${isSelected ? "selected" : ""}`}
+                    onClick={() => setSelectedStatus(st)}
+                  >
+                    {dotColor && (
+                      <span
+                        className="chipStatusDot"
+                        style={{ backgroundColor: dotColor }}
+                      />
+                    )}
+                    <span>{st}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
-
-        {/* Active Filter Chips Bar */}
-        {activeFilterCount > 0 && (
-          <div className="activeFilterChipsBar">
-            <span className="activeChipsLabel">Active:</span>
-            {selectedCategory !== "All Categories" && (
-              <span className="filterChip">
-                <span className="chipCategory">Category:</span>
-                <strong>{selectedCategory}</strong>
-                <button
-                  type="button"
-                  className="chipRemove"
-                  title="Remove category filter"
-                  onClick={() => setSelectedCategory("All Categories")}
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {selectedStatus !== "All Statuses" && (
-              <span className="filterChip">
-                <span className="chipCategory">Status:</span>
-                <strong>{selectedStatus}</strong>
-                <button
-                  type="button"
-                  className="chipRemove"
-                  title="Remove status filter"
-                  onClick={() => setSelectedStatus("All Statuses")}
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            <button
-              type="button"
-              className="chipClearAll"
-              onClick={() => {
-                setSelectedCategory("All Categories");
-                setSelectedStatus("All Statuses");
-              }}
-            >
-              Clear all
-            </button>
-          </div>
-        )}
 
         {/* 1. Mobile-First Data Cards (Zero Horizontal Scroll on <= 768px) */}
         <div className="mobileCardList">
           {filteredInventory.length === 0 ? (
-            <div className="emptyTable">
-              <p>No materials match your filter criteria.</p>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ marginTop: "8px" }}
-                onClick={() => {
-                  setSearch("");
-                  setSelectedCategory("All Categories");
-                  setSelectedStatus("All Statuses");
-                }}
-              >
-                Reset Filters
-              </button>
+            <div className="mobEmptyState">
+              <div className="mobEmptyIcon">📦</div>
+              <h3 className="mobEmptyTitle">No materials found</h3>
+              <p className="mobEmptyDesc">Try changing your search or filters.</p>
+              {(search || selectedCategory !== "All" || selectedStatus !== "All") && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ marginTop: "10px" }}
+                  onClick={() => {
+                    setSearch("");
+                    setSelectedCategory("All");
+                    setSelectedStatus("All");
+                  }}
+                >
+                  Reset Filters
+                </button>
+              )}
             </div>
           ) : (
             filteredInventory.map((item) => {
               const hasCompanies = item.companies && item.companies.length > 0;
+              const statusMeta = getStockStatusMeta(item.status);
+
               return (
                 <div
                   key={item.code || item.name}
-                  className="mobileDataCard"
+                  className="mobMaterialCard"
                   onClick={() => {
                     setSelectedProduct(item);
                     setDrawerTab("overview");
                   }}
                 >
-                  <div className="mobileCardHeader">
-                    <div className="mobileCardTitleArea">
-                      <div style={{ marginBottom: "4px" }}>
-                        <span className="categoryTag" style={{ fontSize: "11px" }}>{item.category}</span>
-                      </div>
-                      <h3 className="mobileCardTitle">{item.name}</h3>
+                  {/* Top: Name, ID, & Status */}
+                  <div className="mobCardTop">
+                    <div className="mobCardTitleBlock">
+                      <h3 className="mobMaterialName">{item.name}</h3>
+                      {item.code && (
+                        <span className="mobMaterialCode">{item.code}</span>
+                      )}
                     </div>
-                    <Badge>{item.status}</Badge>
+                    <span className={`mobStockBadge ${statusMeta.badgeClass}`}>
+                      <span className={`mobStatusDot ${statusMeta.dotClass}`} />
+                      {statusMeta.label}
+                    </span>
                   </div>
 
-                  <div className="mobileCardBody">
-                    <div className="mobileMetricItem">
-                      <span className="mobileMetricLabel">Total Available</span>
-                      <strong className="mobileMetricVal highlight">
-                        {item.availableStock} {item.unit}
-                      </strong>
+                  {/* Available Stock & Category */}
+                  <div className="mobCardMetrics">
+                    <div className="mobMetricBlock stockBlock">
+                      <span className="mobMetricLabel">Available Stock</span>
+                      <div className="mobStockValueWrap">
+                        <strong className="mobStockNumber">
+                          {Number(item.availableStock).toLocaleString("en-IN")}
+                        </strong>
+                        <span className="mobStockUnit">{item.unit || "Pcs"}</span>
+                      </div>
                     </div>
-                    <div className="mobileMetricItem">
-                      <span className="mobileMetricLabel">Company Rates</span>
-                      <strong className="mobileMetricVal">
-                        {!hasCompanies
-                          ? "—"
-                          : item.companies.length > 1
-                          ? `${item.companies.length} Companies`
-                          : `₹ ${Number(item.companies[0].rate).toLocaleString("en-IN")}`}
-                      </strong>
+                    <div className="mobMetricBlock categoryBlock">
+                      <span className="mobMetricLabel">Category</span>
+                      <span className="mobCategoryPill" title={item.category}>
+                        {item.category}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Company Breakdown on Mobile */}
-                  <div className="mobileCompanySection">
-                    {!hasCompanies ? (
-                      <div className="mobileEmptyNotice">
-                        <span>No company or stock added yet</span>
+                  {/* Company & Rate Info - ONLY IF COMPANY DATA EXISTS (Completely hidden if empty) */}
+                  {hasCompanies && (
+                    <div className="mobCardCompanyRow">
+                      <div className="mobCompanyInfo">
+                        <span className="mobMetricLabel">Company / Supplier</span>
+                        <span className="mobCompanyNames" title={item.companies.map((c) => c.name).join(", ")}>
+                          🏢 {item.companies.map((c) => c.name).join(", ")}
+                        </span>
                       </div>
-                    ) : (
-                      item.companies.map((c, cIdx) => (
-                        <div key={cIdx} className="mobileCompanyRow">
-                          <span className="mobileCompanyName">🏢 {c.name}</span>
-                          <span className="mobileCompanyDetails">
-                            {Number(c.stock).toLocaleString("en-IN")} {item.unit} @ ₹{Number(c.rate).toLocaleString("en-IN")}
+                      {item.rate !== null && item.rate !== undefined && (
+                        <div className="mobCompanyRate">
+                          <span className="mobMetricLabel">Rate</span>
+                          <span className="mobRateVal">
+                            ₹{Number(item.rate).toLocaleString("en-IN")}
                           </span>
                         </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="mobileCardFooter">
-                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                      {hasCompanies ? `${item.companies.length} Supplier${item.companies.length > 1 ? "s" : ""}` : "Unassigned"}
-                    </span>
-                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                      <button
-                        type="button"
-                        className="actionBtn edit"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenAdjustModal(item);
-                        }}
-                      >
-                        + Manage Stock
-                      </button>
-                      <button
-                        type="button"
-                        className="actionBtn view"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedProduct(item);
-                          setDrawerTab("overview");
-                        }}
-                      >
-                        Inspect →
-                      </button>
+                      )}
                     </div>
+                  )}
+
+                  {/* Touch-Friendly Action Buttons */}
+                  <div className="mobCardActions">
+                    <button
+                      type="button"
+                      className="mobBtnPrimary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenAdjustModal(item);
+                      }}
+                    >
+                      + Manage Stock
+                    </button>
+                    <button
+                      type="button"
+                      className="mobBtnSecondary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProduct(item);
+                        setDrawerTab("overview");
+                      }}
+                    >
+                      Inspect
+                    </button>
                   </div>
                 </div>
               );

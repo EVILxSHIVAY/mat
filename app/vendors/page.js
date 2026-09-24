@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";
@@ -170,14 +169,6 @@ export default function VendorsPage() {
     }
   };
 
-  // Metrics
-  const totalVendors = vendors.length;
-  const totalSites = vendors.reduce((acc, v) => acc + (v.sites?.length || 0), 0);
-  const totalVouchersIssued = issues.length;
-  const pendingRequestsCount = requests.filter(
-    (r) => String(r.status || "").toLowerCase().includes("pending")
-  ).length;
-
   // Filtered List
   const filteredVendors = useMemo(() => {
     return vendors.filter((v) => {
@@ -267,59 +258,8 @@ export default function VendorsPage() {
         }
       />
 
-      {/* KPI Highlight Strip */}
-      <div className="vendorsKpiGrid">
-        <div className="card vendorKpiCard">
-          <div className="vendorKpiIcon" style={{ background: "#ecfdf5", color: "#059669" }}>
-            👤
-          </div>
-          <div>
-            <span className="kpiLabel">Total Registered Vendors</span>
-            <h2 className="kpiValue">{totalVendors}</h2>
-            <span className="kpiSubtext">Approved field personnel</span>
-          </div>
-        </div>
-
-        <div className="card vendorKpiCard">
-          <div className="vendorKpiIcon" style={{ background: "#eff6ff", color: "#2563eb" }}>
-            📍
-          </div>
-          <div>
-            <span className="kpiLabel">Attached Project Sites</span>
-            <h2 className="kpiValue">{totalSites}</h2>
-            <span className="kpiSubtext">Active site work sectors</span>
-          </div>
-        </div>
-
-        <div className="card vendorKpiCard">
-          <div className="vendorKpiIcon" style={{ background: "#fef3c7", color: "#d97706" }}>
-            📋
-          </div>
-          <div>
-            <span className="kpiLabel">Pending Requisitions</span>
-            <h2 className="kpiValue">{pendingRequestsCount}</h2>
-            <span className="kpiSubtext">
-              <Link href="/material-requests" style={{ color: "inherit", textDecoration: "underline" }}>
-                Review in Requests →
-              </Link>
-            </span>
-          </div>
-        </div>
-
-        <div className="card vendorKpiCard">
-          <div className="vendorKpiIcon" style={{ background: "#f5f3ff", color: "#7c3aed" }}>
-            ↗
-          </div>
-          <div>
-            <span className="kpiLabel">Issued Material Vouchers</span>
-            <h2 className="kpiValue">{totalVouchersIssued}</h2>
-            <span className="kpiSubtext">Dispatched to field vendors</span>
-          </div>
-        </div>
-      </div>
-
       {/* Table Controls */}
-      <div className="tableControls" style={{ borderRadius: "var(--radius-lg)", marginTop: "24px" }}>
+      <div className="tableControls" style={{ borderRadius: "var(--radius-lg)" }}>
         <div className="invSearchBox" style={{ maxWidth: "380px" }}>
           <span>🔍</span>
           <input

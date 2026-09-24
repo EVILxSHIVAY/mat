@@ -1,544 +1,659 @@
 /* ==========================================================================
-   Dashboard Design - Operations & Material Control Center
-   Prioritized for "What Needs Attention Now?"
+   Mobile-First Operations Dashboard Redesign
+   Prioritized for:
+   1. Needs Attention (Quiet if 0, clear alert if > 0)
+   2. Quick Actions (2-column mobile touch grid)
+   3. Compact Stock Status (Total, Low, Out of Stock, Valuation)
+   4. Recent Activity (Compact 3-5 latest entries)
    ========================================================================== */
 
-.dashHeaderSection {
+.mobileDashContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   1. Header
+   ========================================================================== */
+.dashHeader {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-  gap: 16px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 2px;
 }
 
-.dashGreeting {
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-}
-
-.dashGreetingSub {
-  font-size: 13.5px;
-  color: var(--text-muted);
-  margin-top: 3px;
-}
-
-.dashQuickActions {
+.dashHeaderLeft {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.dashActionBtn {
+.dashTitle {
+  font-family: var(--font-display, inherit);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.dashSubtitle {
+  font-size: 13px;
+  color: var(--text-muted, #64748b);
+  margin: 0;
+}
+
+/* Quiet Status Badge */
+.dashQuietStatus {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  height: 42px;
-  padding: 0 16px;
-  border-radius: var(--radius-md);
-  font-size: 13.5px;
-  font-weight: 600;
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  color: var(--text-primary);
-  text-decoration: none;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-
-.dashActionBtn:hover {
-  background: var(--surface-alt);
-  color: var(--primary-forest);
-  border-color: var(--border-strong);
-}
-
-.dashActionBtn.primary {
-  background: var(--primary-forest);
-  border-color: var(--forest-deep);
-  color: #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 77, 60, 0.25);
-}
-
-.dashActionBtn.primary:hover {
-  background: var(--forest-deep);
-  color: #ffffff;
-}
-
-/* ==========================================================================
-   Operational KPI Strip
-   ========================================================================== */
-.dashKpiGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 22px;
-}
-
-.dashKpiCard {
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  padding: 18px 20px;
-  box-shadow: var(--shadow-xs);
-  display: flex;
-  flex-direction: column;
-  transition: border-color 0.15s ease, transform 0.15s ease;
-}
-
-.dashKpiCard:hover {
-  border-color: var(--border-strong);
-}
-
-.dashKpiCard.warningBorder {
-  border-color: var(--red-border);
-  background: #fffafa;
-}
-
-.dashKpiCard.amberBorder {
-  border-color: var(--amber-border);
-  background: #fffdf7;
-}
-
-.dashKpiTop {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.dashKpiLabel {
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-radius: 9999px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: #059669;
+  width: fit-content;
 }
 
-.dashKpiIcon {
-  font-size: 16px;
-}
-
-.dashKpiValue {
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 8px 0 4px;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-}
-
-.dashKpiValue.textAmber {
-  color: var(--amber-primary);
-}
-
-.dashKpiValue.textRed {
-  color: var(--red-dot);
-}
-
-.dashKpiHint {
+.dashQuietDot {
   font-size: 12px;
-  color: var(--text-muted);
-}
-
-.dashKpiLink {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--primary-forest);
-  text-decoration: none;
-  margin-top: 2px;
-}
-
-.dashKpiLink:hover {
-  text-decoration: underline;
-}
-
-/* ==========================================================================
-   "Needs Attention" Operational Alert Section
-   ========================================================================== */
-.attentionCard {
-  border-left: 4px solid var(--red-dot);
-  background: #fffbfb;
-  margin-bottom: 22px;
-}
-
-.attentionHead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-
-.attentionBadge {
-  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  background: var(--red-bg);
-  color: var(--red-text);
-  padding: 3px 8px;
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--red-border);
 }
 
-.attentionCount {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
+.desktopOnly {
+  display: inline-flex;
 }
 
-.attentionItemsList {
+.mobileOnly {
+  display: none;
+}
+
+/* ==========================================================================
+   2. Needs Attention (Compact Actionable Alert)
+   ========================================================================== */
+.dashAttentionSection {
+  border-left: 4px solid #ef4444;
+  background: #fffafa;
+  padding: 14px 16px;
+  margin: 0;
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+}
+
+.dashAttentionHead {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
-.attentionRow {
+.dashAttentionTitleRow {
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+.dashAttentionIcon {
+  font-size: 14px;
+}
+
+.dashAttentionHeading {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #991b1b;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+.dashAttentionBadge {
+  font-size: 11px;
+  font-weight: 700;
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.dashAttentionList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashAttentionRow {
+  display: flex;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
   background: #ffffff;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default, #e2e8f0);
+  border-radius: 8px;
   transition: all 0.15s ease;
 }
 
-.attentionRow:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-xs);
+.dashAttentionRow:hover {
+  border-color: var(--border-strong, #cbd5e1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.attentionRowLeft {
+.dashAttentionRowLeft {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 9px;
+  min-width: 0;
+  flex: 1;
 }
 
-.attentionDot {
-  width: 10px;
-  height: 10px;
+.dashStatusDot {
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   margin-top: 4px;
   flex-shrink: 0;
 }
 
-.attentionDot.red {
-  background: var(--red-dot);
+.dashStatusDot.red {
+  background: #ef4444;
 }
 
-.attentionDot.amber {
-  background: var(--amber-dot);
-}
-
-.attentionDot.yellow {
+.dashStatusDot.amber {
   background: #f59e0b;
 }
 
-.attentionRowLeft strong {
-  font-size: 13.5px;
-  color: var(--text-primary);
-  display: block;
+.dashStatusDot.yellow {
+  background: #eab308;
 }
 
-.attentionSub {
-  font-size: 12.5px;
-  color: var(--text-muted);
+.dashAttentionRowTitle {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+  line-height: 1.25;
+}
+
+.dashAttentionRowDesc {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted, #64748b);
   margin-top: 2px;
 }
 
-.attentionActionBtn {
-  min-height: 38px;
-  padding: 0 16px;
-  font-size: 13px;
+.dashAttentionActionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 11px;
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg-subtle, #f8fafc);
+  color: var(--text-primary, #0f172a);
+  border-radius: 6px;
+  text-decoration: none;
+  border: 1px solid var(--border-default, #cbd5e1);
   white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.dashAttentionActionBtn:hover {
+  background: #ffffff;
+  border-color: var(--primary-forest, #15803d);
+  color: var(--primary-forest, #15803d);
 }
 
 /* ==========================================================================
-   Material Movement Pipeline
+   3. Quick Actions (Touch Grid)
    ========================================================================== */
-.movementCard {
-  margin-bottom: 22px;
+.dashSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.movementPipelineGrid {
+.dashSectionHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0 4px;
-  overflow-x: auto;
 }
 
-.pipelineStage {
-  flex: 1;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  min-width: 140px;
-}
-
-.pipelineStage.highlight {
-  background: var(--forest-light);
-  border-color: var(--green-border);
-}
-
-.pipelineStageName {
-  font-size: 10.5px;
+.dashSectionEyebrow {
+  font-size: 11px;
   font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #64748b);
 }
 
-.pipelineVal {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 6px 0 2px;
-}
-
-.pipelineStage.highlight .pipelineVal {
-  color: var(--forest-dark);
-}
-
-.pipelineUnit {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-}
-
-.pipelineArrow {
-  font-size: 18px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-/* ==========================================================================
-   Split Layout: Activity Stream & Operations Hub
-   ========================================================================== */
-.dashSplitGrid {
+.dashQuickGrid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
 }
 
-.activityList {
-  display: flex;
-  flex-direction: column;
-}
-
-.activityItem {
+.dashQuickBtn {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--border-subtle);
-  transition: background 0.12s ease;
+  gap: 10px;
+  padding: 10px 14px;
+  min-height: 48px;
+  background: #ffffff;
+  border: 1px solid var(--border-default, #e2e8f0);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text-primary, #0f172a);
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+  transition: all 0.15s ease;
+  user-select: none;
 }
 
-.activityItem:hover {
-  background: var(--surface-subtle);
+.dashQuickBtn:hover {
+  background: var(--bg-subtle, #f8fafc);
+  border-color: var(--primary-forest, #15803d);
+  box-shadow: 0 2px 6px rgba(21, 128, 61, 0.1);
+  transform: translateY(-1px);
 }
 
-.activityItem:last-child {
-  border-bottom: 0;
+.dashQuickBtn.primary {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
 }
 
-.activityIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-alt);
-  color: var(--primary-forest);
+.dashQuickBtn.primary:hover {
+  background: #dcfce7;
+  border-color: var(--primary-forest, #15803d);
+}
+
+.dashQuickIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: rgba(21, 128, 61, 0.08);
+  color: var(--primary-forest, #15803d);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
-.activityInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.activityTitle {
-  display: block;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.activitySubtitle {
-  display: block;
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.activityRight {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.activityDate {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.opsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-.opsCard {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-default);
-  text-decoration: none;
-  transition: all 0.15s ease;
-  min-height: 52px;
-}
-
-.opsCard:hover {
-  background: #ffffff;
-  border-color: var(--primary-forest);
-  box-shadow: var(--shadow-xs);
-  transform: translateY(-1px);
-}
-
-.opsIcon {
-  font-size: 18px;
-  color: var(--primary-forest);
-  flex-shrink: 0;
-}
-
-.opsCard b {
-  display: block;
+.dashQuickLabel {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary);
-}
-
-.opsCard small {
-  font-size: 11.5px;
-  color: var(--text-muted);
+  line-height: 1.2;
 }
 
 /* ==========================================================================
-   Mobile Responsive Rules (320px - 640px)
+   4. Main Content Split: Stock Summary & Recent Activity
    ========================================================================== */
-@media (max-width: 900px) {
-  .dashSplitGrid {
-    grid-template-columns: 1fr;
-  }
+.dashMainGrid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 16px;
+  align-items: start;
 }
 
-@media (max-width: 640px) {
-  .dashHeaderSection {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    margin-bottom: 16px;
+/* Stock Summary Card */
+.dashStockSection {
+  background: #ffffff;
+  border: 1px solid var(--border-default, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+}
+
+.dashStockHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.dashCardTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  margin: 2px 0 0 0;
+}
+
+.dashStockValuation {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.dashStockValuationLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: block;
+}
+
+.dashStockValuationVal {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-forest, #15803d);
+}
+
+.dashStockMetricsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.dashStockRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  background: var(--surface-subtle, #f8fafc);
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, #f1f5f9);
+}
+
+.dashStockRowLabel {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary, #475569);
+}
+
+.dashStockRowVal {
+  font-family: var(--font-display, inherit);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.dashStockRowVal.highlight {
+  color: var(--primary-forest, #15803d);
+  font-size: 14.5px;
+}
+
+.dashStockRowVal.warningText {
+  color: #d97706;
+}
+
+.dashStockRowVal.dangerText {
+  color: #dc2626;
+}
+
+.dashStockRowHint {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted, #64748b);
+}
+
+.dashStockFooter {
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-default, #e2e8f0);
+}
+
+.dashStockLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 36px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary-forest, #15803d);
+  text-decoration: none;
+  background: var(--surface-subtle, #f8fafc);
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle, #f1f5f9);
+  transition: all 0.15s ease;
+}
+
+.dashStockLink:hover {
+  background: #ffffff;
+  border-color: var(--primary-forest, #15803d);
+}
+
+/* ==========================================================================
+   5. Recent Activity Section (Compact)
+   ========================================================================== */
+.dashActivitySection {
+  background: #ffffff;
+  border: 1px solid var(--border-default, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+}
+
+.dashActivityHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.dashActivityLink {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-forest, #15803d);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.dashActivityLink:hover {
+  text-decoration: underline;
+}
+
+.dashActivityList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dashActivityItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #ffffff;
+  border: 1px solid var(--border-default, #e2e8f0);
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+
+.dashActivityItem:hover {
+  background: var(--surface-subtle, #f8fafc);
+}
+
+.dashActivityLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dashActivityIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--surface-alt, #f1f5f9);
+  color: var(--primary-forest, #15803d);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.dashActivityDetails {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.dashActivityTitle {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dashActivitySubtitle {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dashActivityRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.dashActivityDate {
+  font-size: 10.5px;
+  color: var(--text-muted, #64748b);
+}
+
+.dashEmptyActivity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface-subtle, #f8fafc);
+  border-radius: 8px;
+  border: 1px dashed var(--border-default, #cbd5e1);
+  color: var(--text-muted, #64748b);
+}
+
+.dashEmptyIcon {
+  font-size: 20px;
+  opacity: 0.7;
+}
+
+.dashEmptyActivity strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text-primary, #0f172a);
+  margin-bottom: 2px;
+}
+
+.dashEmptyActivity p {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+/* ==========================================================================
+   Mobile Responsive Rules (<= 768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+  .dashMainGrid {
+    grid-template-columns: 1fr;
+    gap: 14px;
   }
 
-  .dashGreeting {
-    font-size: 20px;
-  }
-
-  .dashQuickActions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+  .dashQuickGrid {
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
-    width: 100%;
   }
 
-  .dashActionBtn {
-    min-height: 44px;
-    justify-content: center;
-    font-size: 13px;
-    padding: 0 10px;
-  }
-
-  .dashKpiGrid {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-
-  .dashKpiCard {
-    padding: 14px 12px;
-  }
-
-  .dashKpiValue {
-    font-size: 22px;
-    margin: 6px 0 2px;
-  }
-
-  .attentionRow {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    padding: 12px;
-  }
-
-  .attentionActionBtn {
-    width: 100%;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13.5px;
-  }
-
-  .movementPipelineGrid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    overflow-x: visible;
-  }
-
-  .pipelineStage {
-    min-width: 0;
-    padding: 10px 12px;
-  }
-
-  .pipelineVal {
-    font-size: 18px;
-    margin: 4px 0 2px;
-  }
-
-  .pipelineArrow {
+  .desktopOnly {
     display: none;
   }
 
-  .opsGrid {
-    grid-template-columns: 1fr;
+  .mobileOnly {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobileDashContainer {
+    gap: 12px;
+  }
+
+  .dashTitle {
+    font-size: 19px;
+  }
+
+  .dashSubtitle {
+    font-size: 12px;
+  }
+
+  .dashAttentionSection {
+    padding: 12px;
+  }
+
+  .dashAttentionRow {
+    padding: 8px 10px;
+  }
+
+  .dashAttentionRowTitle {
+    font-size: 12.5px;
+  }
+
+  .dashAttentionRowDesc {
+    font-size: 11px;
+  }
+
+  .dashQuickBtn {
+    padding: 10px 10px;
+    min-height: 46px;
     gap: 8px;
   }
 
-  .opsCard {
-    min-height: 46px;
+  .dashQuickLabel {
+    font-size: 12.5px;
+  }
+
+  .dashStockSection,
+  .dashActivitySection {
+    padding: 12px;
+  }
+
+  .dashStockRow {
+    padding: 8px 10px;
+  }
+
+  .dashStockRowLabel {
+    font-size: 12px;
+  }
+
+  .dashStockRowVal {
+    font-size: 13px;
+  }
+
+  .dashActivityItem {
+    padding: 8px 10px;
+  }
+
+  .dashActivityTitle {
+    font-size: 12px;
+  }
+
+  .dashActivitySubtitle {
+    font-size: 10.5px;
   }
 }

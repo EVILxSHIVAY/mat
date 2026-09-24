@@ -4,284 +4,279 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { Badge } from "@/components/ui/Badge";
-import { getDashboardMetrics } from "@/lib/dataService";
+import { getDashboardMetrics, calculateLiveInventory } from "@/lib/dataService";
 import "@/components/ui/ui.css";
 import "./dashboard.css";
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState(() => getDashboardMetrics());
+  const [inventory, setInventory] = useState(() => calculateLiveInventory());
+
+  const refreshData = () => {
+    setMetrics(getDashboardMetrics());
+    setInventory(calculateLiveInventory());
+  };
 
   useEffect(() => {
-    setMetrics(getDashboardMetrics());
+    refreshData();
+    window.addEventListener("pdv_stock_updated", refreshData);
+    window.addEventListener("pdv_requests_updated", refreshData);
+    window.addEventListener("storage", refreshData);
+    return () => {
+      window.removeEventListener("pdv_stock_updated", refreshData);
+      window.removeEventListener("pdv_requests_updated", refreshData);
+      window.removeEventListener("storage", refreshData);
+    };
   }, []);
+
+  // Stock Aggregates
+  const totalStockUnits = inventory.reduce(
+    (sum, item) => sum + (Number(item.availableStock) || 0),
+    0
+  );
+  const outOfStockCount = inventory.filter(
+    (item) => (Number(item.availableStock) || 0) === 0
+  ).length;
+
+  const hasIssues =
+    metrics.lowStockCount > 0 ||
+    metrics.pendingRequestsCount > 0 ||
+    metrics.totalOutstanding > 0;
+
+  const totalIssuesCount =
+    (metrics.lowStockCount > 0 ? 1 : 0) +
+    (metrics.pendingRequestsCount > 0 ? 1 : 0) +
+    (metrics.totalOutstanding > 0 ? 1 : 0);
 
   return (
     <Shell>
-      {/* 1. Header Greeting & Quick Actions */}
-      <div className="dashHeaderSection">
-        <div>
-          <h1 className="dashGreeting">Operations Control Center</h1>
-          <p className="dashGreetingSub">
-            Live warehouse stock levels, purchase orders, and site dispatches.
-          </p>
-        </div>
-
-        <div className="dashQuickActions">
-          <Link href="/material-requests" className="dashActionBtn primary">
-            <span>📋 Vendor Requests & Issue</span>
-          </Link>
-          <Link href="/material-consumption" className="dashActionBtn">
-            <span>◔ Consumption</span>
-          </Link>
-          <Link href="/suppliers" className="dashActionBtn">
-            <span>🏢 Suppliers</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* 2. Operational KPI Strip - Priority Hierarchy per Section 16 */}
-      <div className="dashKpiGrid">
-        <div className="dashKpiCard">
-          <div className="dashKpiTop">
-            <span className="dashKpiLabel">Inventory Value</span>
-            <span className="dashKpiIcon">📦</span>
+      <div className="mobileDashContainer">
+        {/* 1. SIMPLE HEADER */}
+        <header className="dashHeader">
+          <div className="dashHeaderLeft">
+            <h1 className="dashTitle">Operations Dashboard</h1>
+            <p className="dashSubtitle">Real-time stock, requests & site movements</p>
           </div>
-          <div className="dashKpiValue">
-            ₹ {metrics.totalStockValue > 0 ? (metrics.totalStockValue >= 100000 ? `${(metrics.totalStockValue / 100000).toFixed(2)}L` : metrics.totalStockValue.toLocaleString()) : "0"}
-          </div>
-          <span className="dashKpiHint">{metrics.totalMaterialsCount} catalog materials</span>
-        </div>
-
-        <div className={`dashKpiCard ${metrics.lowStockCount > 0 ? "warningBorder" : ""}`}>
-          <div className="dashKpiTop">
-            <span className="dashKpiLabel">Low Stock</span>
-            <span className="dashKpiIcon">⚠️</span>
-          </div>
-          <div className={`dashKpiValue ${metrics.lowStockCount > 0 ? "textRed" : ""}`}>
-            {metrics.lowStockCount}
-          </div>
-          <Link href="/inventory?filter=low" className="dashKpiLink">
-            Review low stock →
-          </Link>
-        </div>
-
-        <div className={`dashKpiCard ${metrics.pendingRequestsCount > 0 ? "amberBorder" : ""}`}>
-          <div className="dashKpiTop">
-            <span className="dashKpiLabel">Pending Requests</span>
-            <span className="dashKpiIcon">📋</span>
-          </div>
-          <div className={`dashKpiValue ${metrics.pendingRequestsCount > 0 ? "textAmber" : ""}`}>
-            {metrics.pendingRequestsCount || 0}
-          </div>
-          <Link href="/material-requests" className="dashKpiLink">
-            Review requests →
-          </Link>
-        </div>
-
-        <div className="dashKpiCard">
-          <div className="dashKpiTop">
-            <span className="dashKpiLabel">Outstanding</span>
-            <span className="dashKpiIcon">⚖</span>
-          </div>
-          <div className="dashKpiValue">
-            ₹ {metrics.totalOutstanding.toLocaleString()}
-          </div>
-          <span className="dashKpiHint">
-            Billed: ₹ {metrics.totalBilled.toLocaleString()}
-          </span>
-        </div>
-      </div>
-
-      {/* 3. "Needs Attention" List - Urgent Action Items First */}
-      {(metrics.lowStockCount > 0 || metrics.pendingRequestsCount > 0) ? (
-        <section className="card attentionCard animate-fade-in">
-          <div className="attentionHead">
-            <span className="attentionBadge">NEEDS ATTENTION</span>
-            <span className="attentionCount">
-              {metrics.lowStockCount + (metrics.pendingRequestsCount || 0)} items requiring operational action
-            </span>
-          </div>
-
-          <div className="attentionItemsList">
-            {metrics.lowStockCount > 0 && (
-              <div className="attentionRow">
-                <div className="attentionRowLeft">
-                  <span className="attentionDot red" />
-                  <div>
-                    <strong>{metrics.lowStockCount} materials at low stock</strong>
-                    <p className="attentionSub">
-                      Stock running low. Purchase replenishment recommended.
-                    </p>
-                  </div>
-                </div>
-                <Link href="/inventory?filter=low" className="btn btn-secondary attentionActionBtn">
-                  Review Stock
-                </Link>
-              </div>
-            )}
-
-            {metrics.pendingRequestsCount > 0 && (
-              <div className="attentionRow">
-                <div className="attentionRowLeft">
-                  <span className="attentionDot amber" />
-                  <div>
-                    <strong>{metrics.pendingRequestsCount} site requests waiting for approval</strong>
-                    <p className="attentionSub">
-                      Field requisitions awaiting supervisor review and warehouse dispatch.
-                    </p>
-                  </div>
-                </div>
-                <Link href="/material-requests" className="btn btn-primary attentionActionBtn">
-                  Review Requests
-                </Link>
-              </div>
-            )}
-          </div>
-        </section>
-      ) : (
-        <section className="card attentionCard healthy animate-fade-in" style={{ borderColor: "var(--green-border)", background: "var(--green-bg)" }}>
-          <div className="attentionHead" style={{ margin: 0 }}>
-            <span className="attentionBadge" style={{ background: "var(--green-border)", color: "var(--green-text)" }}>ALL HEALTHY</span>
-            <span style={{ fontSize: "13px", color: "var(--green-text)", fontWeight: 600 }}>
-              Zero critical stock shortages, pending approvals, or overdue orders.
-            </span>
-          </div>
-        </section>
-      )}
-
-      {/* 4. Material Movement Pipeline */}
-      <section className="card movementCard">
-        <div className="sectionHead">
-          <div>
-            <h2>Material Movement Pipeline</h2>
-            <p>End-to-end tracked lifecycle of materials through procurement and site consumption</p>
-          </div>
-        </div>
-
-        <div className="movementPipelineGrid">
-          <div className="pipelineStage">
-            <span className="pipelineStageName">1. PURCHASED</span>
-            <strong className="pipelineVal">{metrics.movement.purchased}</strong>
-            <span className="pipelineUnit">Units in Total</span>
-          </div>
-          <div className="pipelineArrow">→</div>
-
-          <div className="pipelineStage">
-            <span className="pipelineStageName">2. DISPATCHED / ISSUED</span>
-            <strong className="pipelineVal">{metrics.movement.issued}</strong>
-            <span className="pipelineUnit">Units to Sites</span>
-          </div>
-          <div className="pipelineArrow">→</div>
-
-          <div className="pipelineStage">
-            <span className="pipelineStageName">3. CONSUMED AT SITE</span>
-            <strong className="pipelineVal">{metrics.movement.consumed}</strong>
-            <span className="pipelineUnit">Units Utilized</span>
-          </div>
-          <div className="pipelineArrow">→</div>
-
-          <div className="pipelineStage highlight">
-            <span className="pipelineStageName">4. REMAINING AT SITES</span>
-            <strong className="pipelineVal">{metrics.movement.remainingAtSite}</strong>
-            <span className="pipelineUnit">Available at Sites</span>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Split Section: Recent Activity & Quick Navigation */}
-      <div className="dashSplitGrid">
-        {/* Recent Activity Stream */}
-        <section className="card tableCard">
-          <div className="sectionHead" style={{ padding: "16px 20px 0" }}>
-            <div>
-              <h2>Recent Operational Activity</h2>
-              <p>Live chronological ledger of dispatches, purchases, and consumptions</p>
+          {/* Quiet status chip on desktop */}
+          {!hasIssues && (
+            <div className="dashQuietStatus desktopOnly">
+              <span className="dashQuietDot">✓</span>
+              <span>All caught up · Zero critical alerts</span>
             </div>
+          )}
+        </header>
+
+        {/* 2. NEEDS ATTENTION (Conditional Alert or Quiet Status) */}
+        {!hasIssues ? (
+          <div className="dashQuietStatus mobileOnly">
+            <span className="dashQuietDot">✓</span>
+            <span>All caught up · Zero critical alerts</span>
+          </div>
+        ) : (
+          <section className="dashAttentionSection card" aria-label="Actionable items">
+            <div className="dashAttentionHead">
+              <div className="dashAttentionTitleRow">
+                <span className="dashAttentionIcon">⚠️</span>
+                <h2 className="dashAttentionHeading">Needs Attention</h2>
+              </div>
+              <span className="dashAttentionBadge">
+                {totalIssuesCount} action{totalIssuesCount > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <div className="dashAttentionList">
+              {metrics.pendingRequestsCount > 0 && (
+                <div className="dashAttentionRow">
+                  <div className="dashAttentionRowLeft">
+                    <span className="dashStatusDot amber" />
+                    <div>
+                      <strong className="dashAttentionRowTitle">
+                        {metrics.pendingRequestsCount} Pending Requisition
+                        {metrics.pendingRequestsCount > 1 ? "s" : ""}
+                      </strong>
+                      <span className="dashAttentionRowDesc">
+                        Site requests awaiting review & dispatch
+                      </span>
+                    </div>
+                  </div>
+                  <Link href="/material-requests" className="dashAttentionActionBtn">
+                    View →
+                  </Link>
+                </div>
+              )}
+
+              {metrics.lowStockCount > 0 && (
+                <div className="dashAttentionRow">
+                  <div className="dashAttentionRowLeft">
+                    <span className="dashStatusDot red" />
+                    <div>
+                      <strong className="dashAttentionRowTitle">
+                        {metrics.lowStockCount} Low Stock Item
+                        {metrics.lowStockCount > 1 ? "s" : ""}
+                      </strong>
+                      <span className="dashAttentionRowDesc">
+                        Materials below threshold, purchase needed
+                      </span>
+                    </div>
+                  </div>
+                  <Link href="/inventory?filter=low" className="dashAttentionActionBtn">
+                    View →
+                  </Link>
+                </div>
+              )}
+
+              {metrics.totalOutstanding > 0 && (
+                <div className="dashAttentionRow">
+                  <div className="dashAttentionRowLeft">
+                    <span className="dashStatusDot yellow" />
+                    <div>
+                      <strong className="dashAttentionRowTitle">
+                        ₹ {metrics.totalOutstanding.toLocaleString()} Outstanding
+                      </strong>
+                      <span className="dashAttentionRowDesc">
+                        Party ledger payment balance pending
+                      </span>
+                    </div>
+                  </div>
+                  <Link href="/party-ledger" className="dashAttentionActionBtn">
+                    View →
+                  </Link>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* 3. QUICK ACTIONS (2-Column Mobile Grid) */}
+        <section className="dashSection" aria-label="Quick operations">
+          <div className="dashSectionHeader">
+            <span className="dashSectionEyebrow">QUICK ACTIONS</span>
           </div>
 
-          <div className="activityList">
-            {metrics.recentActivity.length === 0 ? (
-              <div className="emptyTable">
-                <p>No recent activity recorded yet.</p>
-                <small>Create a purchase or issue material to see entries here.</small>
+          <div className="dashQuickGrid">
+            <Link href="/material-requests" className="dashQuickBtn">
+              <span className="dashQuickIcon">↗</span>
+              <span className="dashQuickLabel">Issue Material</span>
+            </Link>
+
+            <Link href="/material-requests" className="dashQuickBtn">
+              <span className="dashQuickIcon">📋</span>
+              <span className="dashQuickLabel">Request Material</span>
+            </Link>
+
+            <Link href="/material-consumption" className="dashQuickBtn">
+              <span className="dashQuickIcon">◔</span>
+              <span className="dashQuickLabel">Record Usage</span>
+            </Link>
+
+            <Link href="/purchases/new" className="dashQuickBtn primary">
+              <span className="dashQuickIcon">＋</span>
+              <span className="dashQuickLabel">Add Purchase</span>
+            </Link>
+          </div>
+        </section>
+
+        {/* Responsive Content Split (Stock Summary & Recent Activity) */}
+        <div className="dashMainGrid">
+          {/* 4. COMPACT STOCK SUMMARY */}
+          <section className="dashStockSection card" aria-label="Stock summary">
+            <div className="dashStockHead">
+              <div>
+                <span className="dashSectionEyebrow">STOCK STATUS</span>
+                <h2 className="dashCardTitle">Live Inventory</h2>
               </div>
-            ) : (
-              metrics.recentActivity.map((act, idx) => (
-                <div key={idx} className="activityItem">
-                  <div className="activityIcon">{act.icon}</div>
-                  <div className="activityInfo">
-                    <span className="activityTitle">{act.title}</span>
-                    <span className="activitySubtitle">{act.subtitle}</span>
-                  </div>
-                  <div className="activityRight">
-                    <Badge variant={act.badgeType}>{act.badge}</Badge>
-                    <span className="activityDate">{act.date}</span>
+              {metrics.totalStockValue > 0 && (
+                <div className="dashStockValuation">
+                  <span className="dashStockValuationLabel">Total Value</span>
+                  <strong className="dashStockValuationVal">
+                    ₹ {metrics.totalStockValue.toLocaleString()}
+                  </strong>
+                </div>
+              )}
+            </div>
+
+            <div className="dashStockMetricsList">
+              <div className="dashStockRow">
+                <span className="dashStockRowLabel">Total Physical Stock</span>
+                <span className="dashStockRowVal highlight">
+                  {totalStockUnits.toLocaleString()}{" "}
+                  <small className="dashStockRowHint">
+                    ({metrics.totalMaterialsCount} materials)
+                  </small>
+                </span>
+              </div>
+
+              <div className="dashStockRow">
+                <span className="dashStockRowLabel">Low Stock Items</span>
+                <span
+                  className={`dashStockRowVal ${
+                    metrics.lowStockCount > 0 ? "warningText" : ""
+                  }`}
+                >
+                  {metrics.lowStockCount}
+                </span>
+              </div>
+
+              <div className="dashStockRow">
+                <span className="dashStockRowLabel">Out of Stock</span>
+                <span
+                  className={`dashStockRowVal ${
+                    outOfStockCount > 0 ? "dangerText" : ""
+                  }`}
+                >
+                  {outOfStockCount}
+                </span>
+              </div>
+            </div>
+
+            <div className="dashStockFooter">
+              <Link href="/inventory" className="dashStockLink">
+                View Inventory Master →
+              </Link>
+            </div>
+          </section>
+
+          {/* 5. RECENT ACTIVITY (Latest 3-5 Compact Activities) */}
+          <section className="dashActivitySection card" aria-label="Recent activity">
+            <div className="dashActivityHead">
+              <div>
+                <span className="dashSectionEyebrow">ACTIVITY</span>
+                <h2 className="dashCardTitle">Recent Operational Activity</h2>
+              </div>
+              <Link href="/reports" className="dashActivityLink">
+                View all →
+              </Link>
+            </div>
+
+            <div className="dashActivityList">
+              {metrics.recentActivity.length === 0 ? (
+                <div className="dashEmptyActivity">
+                  <span className="dashEmptyIcon">📋</span>
+                  <div>
+                    <strong>No recent activity</strong>
+                    <p>Create a purchase or issue material to see activity here.</p>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        {/* Operational Modules Directory */}
-        <section className="card">
-          <div className="sectionHead">
-            <div>
-              <h2>Quick Operations Hub</h2>
-              <p>Direct shortcuts to core functional modules</p>
+              ) : (
+                metrics.recentActivity.slice(0, 5).map((act, idx) => (
+                  <div key={idx} className="dashActivityItem">
+                    <div className="dashActivityLeft">
+                      <span className="dashActivityIcon">{act.icon}</span>
+                      <div className="dashActivityDetails">
+                        <strong className="dashActivityTitle">{act.title}</strong>
+                        <span className="dashActivitySubtitle">{act.subtitle}</span>
+                      </div>
+                    </div>
+                    <div className="dashActivityRight">
+                      <Badge variant={act.badgeType}>{act.badge}</Badge>
+                      <span className="dashActivityDate">{act.date}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-          </div>
-
-          <div className="opsGrid">
-            <Link href="/inventory" className="opsCard">
-              <span className="opsIcon">▦</span>
-              <div>
-                <b>Inventory Master</b>
-                <small>Live stock ledger & status</small>
-              </div>
-            </Link>
-
-            <Link href="/material-requests" className="opsCard">
-              <span className="opsIcon">📋</span>
-              <div>
-                <b>Vendor Requests & Issue</b>
-                <small>Review, approve & issue stock</small>
-              </div>
-            </Link>
-
-            <Link href="/material-consumption" className="opsCard">
-              <span className="opsIcon">◔</span>
-              <div>
-                <b>Site Consumption</b>
-                <small>Record actual usage & balance</small>
-              </div>
-            </Link>
-
-            <Link href="/party-ledger" className="opsCard">
-              <span className="opsIcon">⚖</span>
-              <div>
-                <b>Party & Site Ledger</b>
-                <small>Requisitions & material issues</small>
-              </div>
-            </Link>
-
-            <Link href="/suppliers" className="opsCard">
-              <span className="opsIcon">🏢</span>
-              <div>
-                <b>Suppliers</b>
-                <small>Directory for inventory materials</small>
-              </div>
-            </Link>
-
-            <Link href="/reports" className="opsCard">
-              <span className="opsIcon">📊</span>
-              <div>
-                <b>Reports & Cloud Sync</b>
-                <small>Spreadsheets & Google sync</small>
-              </div>
-            </Link>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </Shell>
   );

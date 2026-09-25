@@ -44,6 +44,13 @@ export default function VendorProfilePage() {
     }
   }, [user, vendorCode, vendorName]);
 
+  const initials = (profile?.name || vendorName)
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "VN";
+
   return (
     <Shell>
       <Title
@@ -55,74 +62,83 @@ export default function VendorProfilePage() {
         <div style={{ maxWidth: "880px", display: "flex", flexDirection: "column", gap: "20px" }}>
           {/* Main Profile Card */}
           <div className="sectionCard">
-            <div className="sectionCardHeader">
-              <div>
-                <h3 className="sectionCardTitle" style={{ fontSize: "18px" }}>
-                  {profile.name}
-                </h3>
-                <span style={{ fontSize: "12.5px", color: "var(--muted)", marginTop: "2px", display: "block" }}>
-                  Vendor Code: <b>{profile.code}</b> · Role: <b>{profile.trade || profile.role || "Site Supervisor"}</b>
-                </span>
+            <div className="profileCardHeader">
+              <div className="profileHeaderLeft">
+                <div className="profileAvatar">{initials}</div>
+                <div className="profileHeaderText">
+                  <h2 className="profileNameTitle">{profile.name}</h2>
+                  <div className="profileSubMeta">
+                    <span>
+                      Vendor Code: <b style={{ color: "#059669" }}>{profile.code}</b>
+                    </span>
+                    <span>•</span>
+                    <span>
+                      Role: <b>{profile.trade || profile.role || "Site Supervisor"}</b>
+                    </span>
+                  </div>
+                </div>
               </div>
               <Badge variant="success">{profile.status || "Active"}</Badge>
             </div>
 
-            <div className="drawerInfoGrid" style={{ rowGap: "16px" }}>
-              <div className="drawerInfoItem">
-                <span>Vendor Person Name</span>
-                <strong>{profile.name}</strong>
+            <div className="profileInfoGrid">
+              <div className="profileInfoItem">
+                <span className="profileInfoLabel">Vendor Person Name</span>
+                <strong className="profileInfoVal">{profile.name}</strong>
               </div>
-              <div className="drawerInfoItem">
-                <span>Vendor Code</span>
-                <strong style={{ color: "#059669" }}>{profile.code}</strong>
+              <div className="profileInfoItem">
+                <span className="profileInfoLabel">Vendor Code</span>
+                <strong className="profileInfoVal code">{profile.code}</strong>
               </div>
-              <div className="drawerInfoItem">
-                <span>Role / Scope</span>
-                <strong>{profile.trade || profile.role || "Site Supervisor"}</strong>
+              <div className="profileInfoItem">
+                <span className="profileInfoLabel">Role / Scope</span>
+                <strong className="profileInfoVal">{profile.trade || profile.role || "Site Supervisor"}</strong>
               </div>
-              <div className="drawerInfoItem">
-                <span>Mobile Phone</span>
-                <strong>{profile.mobile}</strong>
+              <div className="profileInfoItem">
+                <span className="profileInfoLabel">Mobile Phone</span>
+                <strong className="profileInfoVal">{profile.mobile}</strong>
               </div>
-              <div className="drawerInfoItem">
-                <span>Email Address</span>
-                <strong>{profile.email}</strong>
+              <div className="profileInfoItem">
+                <span className="profileInfoLabel">Email Address</span>
+                <strong className="profileInfoVal">{profile.email}</strong>
               </div>
-              <div className="drawerInfoItem">
-                <span>Status</span>
-                <strong>{profile.status || "Active"}</strong>
+              <div className="profileInfoItem">
+                <span className="profileInfoLabel">Account Status</span>
+                <strong className="profileInfoVal status">{profile.status || "Active"}</strong>
               </div>
             </div>
           </div>
 
           {/* Project Sites Card */}
           <div className="sectionCard">
-            <div className="sectionCardHeader">
+            <div className="sectionCardHeader" style={{ borderBottom: "none", paddingBottom: 0, marginBottom: "14px" }}>
               <h3 className="sectionCardTitle">
                 <span>📍</span> Assigned Project Sites ({profile.sites?.length || 0})
               </h3>
             </div>
 
-            <div className="drawerSitesList">
+            <div className="profileSitesList">
               {Array.isArray(profile.sites) && profile.sites.length > 0 ? (
                 profile.sites.map((site, idx) => {
                   const sName = typeof site === "string" ? site : site.name;
                   const sLoc = typeof site === "string" ? "Active Sector" : site.location;
                   return (
-                    <div key={idx} className="drawerSiteItem" style={{ padding: "12px 16px" }}>
-                      <div className="drawerSiteIcon" style={{ fontSize: "20px" }}>🏗</div>
-                      <div style={{ flex: 1 }}>
-                        <strong style={{ fontSize: "14px", color: "var(--foreground)" }}>{sName}</strong>
-                        <span style={{ display: "block", fontSize: "12px", color: "var(--muted)" }}>
-                          {sLoc}
-                        </span>
+                    <div key={idx} className="profileSiteCard">
+                      <div className="profileSiteLeft">
+                        <div className="profileSiteIcon">🏗</div>
+                        <div className="profileSiteInfo">
+                          <strong className="profileSiteName">{sName}</strong>
+                          <span className="profileSiteLoc">📍 {sLoc}</span>
+                        </div>
                       </div>
                       <Badge variant="success">Active Site</Badge>
                     </div>
                   );
                 })
               ) : (
-                <p style={{ color: "var(--muted)", fontSize: "13px" }}>No sites registered.</p>
+                <div className="emptyStateCard" style={{ padding: "28px 16px" }}>
+                  <p style={{ margin: 0, color: "var(--muted)" }}>No sites assigned to this vendor.</p>
+                </div>
               )}
             </div>
           </div>

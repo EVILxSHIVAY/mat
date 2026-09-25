@@ -148,8 +148,8 @@ export default function VendorConsumptionPage() {
         }
       />
 
-      {/* KPI Grid */}
-      <div className="vendorKpiGrid">
+      {/* KPI Grid (Desktop) */}
+      <div className="vendorKpiGrid vendorDesktopSummary">
         <div className="vendorKpiCard">
           <div className="vendorKpiIcon green">📦</div>
           <div>
@@ -177,6 +177,24 @@ export default function VendorConsumptionPage() {
             </h2>
             <span className="kpiSubtext">Uninstalled site stock balance</span>
           </div>
+        </div>
+      </div>
+
+      {/* Mobile-first compact summary grid (Matching Site Consumption UI) */}
+      <div className="vendorMobileSummaryGrid">
+        <div className="vendorMobMetricCard">
+          <span className="vendorMobMetricLabel">Material Types</span>
+          <span className="vendorMobMetricVal green">{siteStock.length}</span>
+        </div>
+        <div className="vendorMobMetricCard">
+          <span className="vendorMobMetricLabel">Consumption Logs</span>
+          <span className="vendorMobMetricVal blue">{consumptions.length}</span>
+        </div>
+        <div className="vendorMobMetricCard span2">
+          <span className="vendorMobMetricLabel">Units Remaining (Balance)</span>
+          <span className="vendorMobMetricVal purple">
+            {siteStock.reduce((acc, s) => acc + s.balance, 0)}
+          </span>
         </div>
       </div>
 

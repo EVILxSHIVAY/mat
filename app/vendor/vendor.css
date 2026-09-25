@@ -2,18 +2,20 @@
    PDV VENDOR & CONTRACTOR PORTAL DESIGN SYSTEM
    ========================================================================== */
 
+/* 1. Hero Banner */
 .vendorBanner {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 24px 28px;
   background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-lg, 14px);
   color: #ffffff;
   box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.3);
   margin-bottom: 24px;
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .vendorBanner::after {
@@ -28,18 +30,32 @@
   pointer-events: none;
 }
 
-.vendorBannerLeft h1 {
+.vendorBannerLeft {
+  flex: 1;
+  min-width: 0;
+}
+
+.vendorBannerTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.vendorBannerTitle {
   font-size: 24px;
   font-weight: 800;
   color: #ffffff;
   letter-spacing: -0.02em;
   margin: 0;
+  line-height: 1.25;
 }
 
-.vendorBannerLeft p {
-  font-size: 13.5px;
-  color: rgba(255, 255, 255, 0.85);
-  margin: 6px 0 0 0;
+.vendorMetaBadges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .vendorMetaBadge {
@@ -51,30 +67,118 @@
   border-radius: 9999px;
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.3);
+  white-space: nowrap;
+}
+
+.desktopMetaBadge {
+  display: inline-flex;
+  align-items: center;
+}
+
+.mobileMetaBadge {
+  display: none;
+}
+
+.vendorBannerDesc {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 8px 0 0 0;
+  line-height: 1.45;
+}
+
+.vendorBannerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: 20px;
+  flex-wrap: wrap;
+}
+
+.vendorActionBtnPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  background: #ffffff;
+  color: #065f46;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.vendorActionBtnPrimary:hover {
+  background: #f0fdf4;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.vendorActionBtnPrimary:active {
+  transform: scale(0.98);
+}
+
+.vendorActionBtnSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.vendorActionBtnSecondary:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.vendorActionBtnSecondary:active {
+  transform: scale(0.98);
+}
+
+/* 2. Key Metrics Strip */
+.vendorMobileSummaryGrid {
+  display: none;
 }
 
 .vendorKpiGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
 
 .vendorKpiCard {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  box-shadow: var(--shadow-sm);
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-lg, 12px);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
   display: flex;
   align-items: center;
   gap: 16px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
 }
 
 .vendorKpiCard:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.07));
 }
 
 .vendorKpiIcon {
@@ -88,29 +192,48 @@
   flex-shrink: 0;
 }
 
-.vendorKpiIcon.green { background: #ecfdf5; color: #059669; }
-.vendorKpiIcon.amber { background: #fef3c7; color: #d97706; }
-.vendorKpiIcon.blue  { background: #eff6ff; color: #2563eb; }
+.vendorKpiIcon.green  { background: #ecfdf5; color: #059669; }
+.vendorKpiIcon.amber  { background: #fef3c7; color: #d97706; }
+.vendorKpiIcon.blue   { background: #eff6ff; color: #2563eb; }
 .vendorKpiIcon.purple { background: #f5f3ff; color: #7c3aed; }
 
+.kpiLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #64748b);
+  display: block;
+}
+
+.kpiValue {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--foreground, #0f172a);
+  margin: 3px 0 2px;
+  line-height: 1.1;
+}
+
+.kpiSubtext {
+  font-size: 12px;
+  color: var(--muted, #64748b);
+  display: block;
+}
+
+/* 3. Two-Column Operations Layout */
 .vendorGridTwo {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
 
-@media (max-width: 900px) {
-  .vendorGridTwo {
-    grid-template-columns: 1fr;
-  }
-}
-
 .sectionCard {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-lg, 12px);
   padding: 20px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  box-sizing: border-box;
 }
 
 .sectionCardHeader {
@@ -119,13 +242,15 @@
   align-items: center;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .sectionCardTitle {
   font-size: 15px;
   font-weight: 700;
-  color: var(--foreground);
+  color: var(--foreground, #0f172a);
   margin: 0;
   display: flex;
   align-items: center;
@@ -136,9 +261,10 @@
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border, #e2e8f0);
   padding-bottom: 8px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .statusTabBtn {
@@ -148,7 +274,7 @@
   font-weight: 600;
   background: transparent;
   border: none;
-  color: var(--muted);
+  color: var(--muted, #64748b);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
@@ -160,8 +286,8 @@
 }
 
 .requestCardItem {
-  background: var(--background);
-  border: 1px solid var(--border);
+  background: var(--background, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 10px;
@@ -175,10 +301,16 @@
 .emptyStateCard {
   text-align: center;
   padding: 40px 20px;
-  color: var(--muted);
-  background: var(--background);
-  border: 1px dashed var(--border);
+  color: var(--muted, #64748b);
+  background: var(--background, #f8fafc);
+  border: 1px dashed var(--border, #cbd5e1);
   border-radius: 10px;
+}
+
+.emptyStateCard p {
+  font-size: 14px;
+  color: var(--text-secondary, #475569);
+  margin: 0;
 }
 
 .sitePillSmall {
@@ -189,4 +321,666 @@
   padding: 2px 8px;
   border-radius: 4px;
   border: 1px solid #e2e8f0;
+}
+
+/* 4. Table Wrapper for Horizontal Scroll */
+.tableWrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-lg, 12px);
+  margin-top: 12px;
+  box-sizing: border-box;
+}
+
+.tableWrapper .dataTable,
+.tableWrapper table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: collapse;
+}
+
+.vendorMobileList {
+  display: none;
+}
+
+/* 5. Modal Styling */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 15, 25, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.modalCard {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.modalHeader h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--foreground, #0f172a);
+  margin: 0;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.closeBtn:hover {
+  background: var(--background, #f1f5f9);
+  color: var(--foreground, #0f172a);
+}
+
+.modalBody {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formGroup label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground, #0f172a);
+}
+
+.formGroup input,
+.formGroup select {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--background, #f8fafc);
+  color: var(--foreground, #0f172a);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.formGroup input:focus,
+.formGroup select:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border, #e2e8f0);
+  background: var(--background, #f8fafc);
+  border-radius: 0 0 14px 14px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 6. Detail Drawer Metadata Styles */
+.drawerInfoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.drawerInfoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.drawerInfoItem span {
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  display: block;
+}
+
+.drawerInfoItem strong {
+  font-size: 13.5px;
+  color: var(--foreground, #0f172a);
+  display: block;
+}
+
+/* 7. Vendor Profile & Assigned Sites Styles */
+.profileCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.profileHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profileAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+  flex-shrink: 0;
+}
+
+.profileHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profileNameTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--foreground, #0f172a);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.profileSubMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--muted, #64748b);
+}
+
+.profileInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.profileInfoItem {
+  background: var(--background, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+}
+
+.profileInfoLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #64748b);
+  display: block;
+}
+
+.profileInfoVal {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--foreground, #0f172a);
+  word-break: break-word;
+  display: block;
+}
+
+.profileInfoVal.code {
+  color: #059669;
+  font-family: var(--font-geist-mono, monospace);
+  font-weight: 700;
+}
+
+.profileInfoVal.status {
+  color: #059669;
+}
+
+/* Assigned Project Sites Modern List */
+.profileSitesList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profileSiteCard {
+  background: var(--background, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.profileSiteCard:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.profileSiteLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profileSiteIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.profileSiteInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profileSiteName {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--foreground, #0f172a);
+}
+
+.profileSiteLoc {
+  font-size: 12px;
+  color: var(--muted, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ==========================================================================
+   RESPONSIVE ADAPTATIONS: TABLET (<= 1100px)
+   ========================================================================== */
+@media (max-width: 1100px) {
+  .vendorKpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .vendorGridTwo {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE ADAPTATIONS: MOBILE (<= 768px, including 360px - 430px)
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* 1. Hero Banner Clean Stacking */
+  .vendorBanner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px 16px;
+    gap: 16px;
+    margin-bottom: 16px;
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.2);
+  }
+
+  .vendorBannerLeft {
+    width: 100%;
+  }
+
+  .vendorBannerTitleRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .vendorBannerTitle {
+    font-size: 22px;
+    line-height: 1.25;
+  }
+
+  .vendorMetaBadges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .desktopMetaBadge {
+    display: none !important;
+  }
+
+  .mobileMetaBadge {
+    display: inline-block !important;
+  }
+
+  .vendorMetaBadge {
+    font-size: 11.5px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .vendorBannerDesc {
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 10px 0 0 0;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .vendorBannerActions {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 14px;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .vendorActionBtnPrimary,
+  .vendorActionBtnSecondary {
+    width: 100%;
+    min-height: 44px;
+    height: 44px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 8px;
+    box-sizing: border-box;
+  }
+
+  /* 2. Compact 2x2 Mobile Summary Grid (Matching Site Consumption UI) */
+  .vendorDesktopSummary {
+    display: none !important;
+  }
+
+  .vendorMobileSummaryGrid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .vendorMobMetricCard {
+    background: var(--card, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-sizing: border-box;
+  }
+
+  .vendorMobMetricCard.span2 {
+    grid-column: span 2;
+  }
+
+  .vendorMobMetricLabel {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--muted, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.25;
+    min-height: 28px;
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .vendorMobMetricVal {
+    font-family: var(--font-display, inherit);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--foreground, #0f172a);
+    line-height: 1.1;
+  }
+
+  .vendorMobMetricVal.amber {
+    color: #d97706;
+  }
+
+  .vendorMobMetricVal.blue {
+    color: #2563eb;
+  }
+
+  .vendorMobMetricVal.purple {
+    color: #7c3aed;
+  }
+
+  .vendorMobMetricVal.emerald,
+  .vendorMobMetricVal.green {
+    color: #059669;
+  }
+
+  /* 3. Operations Sections Stacked */
+  .vendorGridTwo {
+    gap: 14px;
+  }
+
+  .sectionCard {
+    padding: 16px;
+    border-radius: 12px;
+    width: 100%;
+  }
+
+  .sectionCardHeader {
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+
+  .sectionCardTitle {
+    font-size: 14.5px;
+  }
+
+  .requestCardItem {
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+
+  .emptyStateCard {
+    padding: 28px 16px;
+    border-radius: 8px;
+  }
+
+  .emptyStateCard p {
+    font-size: 13.5px;
+  }
+
+  .emptyStateCard button {
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+
+  /* 4. Controls & Tabs */
+  .statusTabs {
+    gap: 6px;
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+  }
+
+  .statusTabBtn {
+    padding: 6px 12px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .tableControls {
+    padding: 12px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  /* 4b. Mobile Data Lists (replaces wide horizontal tables on phones) */
+  .vendorDesktopTable {
+    display: none !important;
+  }
+
+  .vendorMobileList {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 10px;
+    box-sizing: border-box;
+  }
+
+  /* 5. Quick Requisition Modal */
+  .modalOverlay {
+    padding: 12px;
+  }
+
+  .modalCard {
+    border-radius: 12px;
+    max-height: 94vh;
+  }
+
+  .modalHeader {
+    padding: 14px 16px;
+  }
+
+  .modalHeader h3 {
+    font-size: 16px;
+  }
+
+  .modalBody {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .modalFooter {
+    padding: 12px 16px;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .modalFooter button {
+    width: 100%;
+    min-height: 44px;
+    height: 44px;
+    font-size: 14px;
+  }
+
+  /* Profile page drawer grid */
+  .drawerInfoGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* Profile page mobile responsive rules */
+  .profileCardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+  }
+
+  .profileHeaderLeft {
+    gap: 12px;
+  }
+
+  .profileAvatar {
+    width: 46px;
+    height: 46px;
+    font-size: 18px;
+  }
+
+  .profileNameTitle {
+    font-size: 18px;
+  }
+
+  .profileInfoGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .profileInfoItem {
+    padding: 10px 14px;
+  }
+
+  .profileSiteCard {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .profileSiteIcon {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+  }
+
+  .profileSiteName {
+    font-size: 14px;
+  }
 }

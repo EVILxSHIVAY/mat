@@ -159,49 +159,42 @@ export default function VendorDashboardPage() {
       {/* 1. Header Banner */}
       <div className="vendorBanner">
         <div className="vendorBannerLeft">
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <h1>{companyName}</h1>
-            <span className="vendorMetaBadge">
-              Code: {vendorCode} · {trade}
-            </span>
+          <div className="vendorBannerTitleRow">
+            <h1 className="vendorBannerTitle">{companyName}</h1>
+            <div className="vendorMetaBadges">
+              <span className="vendorMetaBadge desktopMetaBadge">
+                Code: {vendorCode} &bull; {trade}
+              </span>
+              <span className="vendorMetaBadge mobileMetaBadge">
+                Code: {vendorCode}
+              </span>
+              <span className="vendorMetaBadge mobileMetaBadge">
+                {trade}
+              </span>
+            </div>
           </div>
-          <p>Vendor Portal · Material requisitions, issued vouchers, and site stock balance.</p>
+          <p className="vendorBannerDesc">Vendor Portal · Material requisitions, issued vouchers, and site stock balance.</p>
         </div>
 
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <div className="vendorBannerActions">
           <button
             type="button"
-            className="btn btn-primary"
+            className="vendorActionBtnPrimary"
             onClick={() => setIsNewReqOpen(true)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              background: "#ffffff",
-              color: "#065f46",
-              border: "none",
-              fontWeight: 700,
-            }}
           >
             <span>+</span> Request Materials
           </button>
           <Link
             href="/vendor/issued"
-            className="btn btn-secondary"
-            style={{
-              background: "rgba(255, 255, 255, 0.15)",
-              color: "#ffffff",
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-              textDecoration: "none",
-            }}
+            className="vendorActionBtnSecondary"
           >
             View Issued Stock ↗
           </Link>
         </div>
       </div>
 
-      {/* 2. Key Metrics Strip */}
-      <div className="vendorKpiGrid">
+      {/* 2. Key Metrics Strip (Desktop) */}
+      <div className="vendorKpiGrid vendorDesktopSummary">
         <div className="vendorKpiCard">
           <div className="vendorKpiIcon green">📋</div>
           <div>
@@ -236,6 +229,26 @@ export default function VendorDashboardPage() {
             <h2 className="kpiValue">{totalIssuedCount}</h2>
             <span className="kpiSubtext">Vouchers dispatched by warehouse</span>
           </div>
+        </div>
+      </div>
+
+      {/* 2b. Compact 2x2 Key Metrics (Mobile - matching Site Consumption UI) */}
+      <div className="vendorMobileSummaryGrid">
+        <div className="vendorMobMetricCard">
+          <span className="vendorMobMetricLabel">Requisitions</span>
+          <span className="vendorMobMetricVal">{totalRequests}</span>
+        </div>
+        <div className="vendorMobMetricCard">
+          <span className="vendorMobMetricLabel">Pending Approval</span>
+          <span className="vendorMobMetricVal amber">{pendingRequests}</span>
+        </div>
+        <div className="vendorMobMetricCard">
+          <span className="vendorMobMetricLabel">Approved for Issue</span>
+          <span className="vendorMobMetricVal blue">{approvedRequests}</span>
+        </div>
+        <div className="vendorMobMetricCard">
+          <span className="vendorMobMetricLabel">Issued to Me</span>
+          <span className="vendorMobMetricVal purple">{totalIssuedCount}</span>
         </div>
       </div>
 

@@ -180,8 +180,8 @@ export default function VendorRequestsPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="tableWrapper" style={{ borderRadius: "var(--radius-lg)" }}>
+      {/* Table (Desktop) */}
+      <div className="tableWrapper vendorDesktopTable" style={{ borderRadius: "var(--radius-lg)" }}>
         <table className="dataTable">
           <thead>
             <tr>
@@ -268,6 +268,87 @@ export default function VendorRequestsPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile-first compact cards (Hidden on desktop) */}
+      <div className="vendorMobileList">
+        {filteredRequests.length === 0 ? (
+          <div className="emptyStateCard" style={{ padding: "36px 16px" }}>
+            <p style={{ fontSize: "14px", color: "var(--muted)", margin: 0 }}>
+              No material requests found in this category.
+            </p>
+          </div>
+        ) : (
+          filteredRequests.map((req, idx) => {
+            const statusStr = String(req.status || "Pending Approval");
+            const isApproved = statusStr.toLowerCase().includes("approved");
+            const isIssued = statusStr.toLowerCase().includes("issued");
+            const isRejected = statusStr.toLowerCase().includes("rejected");
+
+            return (
+              <div
+                key={req.id || idx}
+                className="mobileDataCard"
+                onClick={() => setSelectedRequest(req)}
+              >
+                <div className="mobileCardHeader">
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className="vendorCodeBadge">{req.id}</span>
+                    <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                      {req.createdAt || "Today"}
+                    </span>
+                  </div>
+                  <Badge
+                    variant={
+                      isIssued
+                        ? "success"
+                        : isApproved
+                        ? "info"
+                        : isRejected
+                        ? "error"
+                        : "warning"
+                    }
+                  >
+                    {req.status}
+                  </Badge>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--foreground)" }}>
+                    {req.materialName}
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "12.5px", color: "var(--muted)" }}>
+                      Site: <strong>{req.siteName || "General Site"}</strong>
+                    </span>
+                    <span className="siteTag" style={{ fontWeight: 700, color: "#059669", fontSize: "13px" }}>
+                      {req.quantityNeeded} {req.unit || "Pcs"}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginTop: "4px",
+                      paddingTop: "8px",
+                      borderTop: "1px solid var(--border-default, #f1f5f9)",
+                    }}
+                  >
+                    <span style={{ fontSize: "11.5px", color: "var(--muted)" }}>
+                      Priority: <strong>{req.priority || "Normal"}</strong>
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 600 }}>
+                      View Details ↗
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Drawer */}

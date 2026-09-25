@@ -59,8 +59,8 @@ export default function VendorIssuedMaterialsPage() {
         desc="Warehouse material dispatches, delivery vouchers, and received physical stock for project execution."
       />
 
-      {/* KPI Highlight Strip */}
-      <div className="vendorKpiGrid">
+      {/* Desktop KPI Highlight Strip */}
+      <div className="vendorKpiGrid vendorDesktopSummary">
         <div className="vendorKpiCard">
           <div className="vendorKpiIcon purple">↗</div>
           <div>
@@ -80,6 +80,18 @@ export default function VendorIssuedMaterialsPage() {
         </div>
       </div>
 
+      {/* Mobile-first compact 2-column KPI summary (Matching Site Consumption UI) */}
+      <div className="vendorMobileSummaryGrid">
+        <div className="vendorMobMetricCard">
+          <span className="vendorMobMetricLabel">Issue Vouchers</span>
+          <span className="vendorMobMetricVal purple">{issues.length}</span>
+        </div>
+        <div className="vendorMobMetricCard">
+          <span className="vendorMobMetricLabel">Units Received</span>
+          <span className="vendorMobMetricVal emerald">{totalItemsCount}</span>
+        </div>
+      </div>
+
       {/* Controls */}
       <div className="tableControls" style={{ borderRadius: "var(--radius-lg)", marginBottom: "16px" }}>
         <div className="invSearchBox" style={{ maxWidth: "380px" }}>
@@ -96,8 +108,8 @@ export default function VendorIssuedMaterialsPage() {
         </span>
       </div>
 
-      {/* Issues Table */}
-      <div className="tableWrapper" style={{ borderRadius: "var(--radius-lg)" }}>
+      {/* Issues Table (Desktop) */}
+      <div className="tableWrapper vendorDesktopTable" style={{ borderRadius: "var(--radius-lg)" }}>
         <table className="dataTable">
           <thead>
             <tr>
@@ -211,6 +223,97 @@ export default function VendorIssuedMaterialsPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile-first compact cards (Hidden on desktop) */}
+      <div className="vendorMobileList">
+        {filteredIssues.length === 0 ? (
+          <div className="emptyStateCard" style={{ padding: "36px 16px" }}>
+            <p style={{ fontSize: "14px", color: "var(--muted)", margin: 0 }}>
+              {search
+                ? `No issue vouchers found matching "${search}".`
+                : "No materials have been issued to your vendor account yet."}
+            </p>
+            {search && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ marginTop: "12px", minHeight: "40px", padding: "0 16px", fontSize: "13px" }}
+                onClick={() => setSearch("")}
+              >
+                Clear Search
+              </button>
+            )}
+          </div>
+        ) : (
+          filteredIssues.map((iss, idx) => {
+            const materials =
+              iss.materials && iss.materials.length > 0
+                ? iss.materials
+                : iss.items && iss.items.length > 0
+                ? iss.items
+                : iss.materialName
+                ? [{ name: iss.materialName, quantity: iss.quantity || iss.qty || 1, unit: iss.unit }]
+                : [];
+            const totalQty =
+              materials.reduce((acc, m) => acc + (Number(m.quantity ?? m.qty) || 1), 0) ||
+              iss.quantity ||
+              iss.qty ||
+              1;
+
+            return (
+              <div
+                key={iss.number || idx}
+                className="mobileDataCard"
+                onClick={() => setSelectedIssue(iss)}
+              >
+                <div className="mobileCardHeader">
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className="vendorCodeBadge">
+                      {iss.number || iss.challanNo || `MI-${idx + 1}`}
+                    </span>
+                    <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                      {iss.date || "Today"}
+                    </span>
+                  </div>
+                  <Badge variant="success">Issued</Badge>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
+                  <div style={{ fontSize: "13.5px", fontWeight: 700, color: "var(--foreground)" }}>
+                    🏢 {iss.department || vendorName}
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+                    {materials.map((m, mIdx) => (
+                      <span key={mIdx} className="siteTag" style={{ fontSize: "12px" }}>
+                        {m.name} ({m.quantity ?? m.qty ?? 1} {m.unit || inferUnit(m.name)})
+                      </span>
+                    ))}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginTop: "6px",
+                      paddingTop: "8px",
+                      borderTop: "1px solid var(--border-default, #f1f5f9)",
+                    }}
+                  >
+                    <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                      Total: <strong style={{ color: "#059669" }}>{totalQty} Items</strong>
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 600 }}>
+                      View Voucher ↗
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Drawer */}

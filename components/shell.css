@@ -533,7 +533,7 @@ header {
     to { opacity: 1; transform: translateY(0); }
 }
 
-@media(max-width:767px) {
+@media (max-width: 768px) {
     .sidebar {
         transform: translateX(-100%);
         width: 280px;

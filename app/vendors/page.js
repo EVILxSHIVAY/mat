@@ -277,7 +277,15 @@ export default function VendorsPage() {
       </div>
 
       {/* Vendors Table */}
-      <div className="tableWrapper" style={{ borderRadius: "var(--radius-lg)", marginTop: "12px" }}>
+      <div
+        className="tableWrapper"
+        style={{
+          borderRadius: "var(--radius-lg)",
+          marginTop: "12px",
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
         <table className="dataTable">
           <thead>
             <tr>

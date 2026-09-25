@@ -1,21 +1,23 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";
-import DetailDrawer from "@/components/ui/DetailDrawer";
 import {
   getStorageData,
   setStorageData,
   STORAGE_KEYS,
-  calculateLiveInventory,
   getMasterMaterialCatalog,
+  calculateLiveInventory,
   deductProductCompanyStock,
   inferUnit,
 } from "@/lib/dataService";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
+import DetailDrawer from "@/components/ui/DetailDrawer";
 import "@/components/ui/ui.css";
+import "./requests.css";
 
 const STATUS_TABS = ["All", "Pending Approval", "Approved", "Partially Issued", "Issued", "Rejected"];
 
@@ -62,21 +64,30 @@ export default function VendorRequestsPage() {
     remarks: "",
   });
 
-  useEffect(() => {
-    // 1. Load Requests
-    const rawRequests = getStorageData(STORAGE_KEYS.NEEDED, []);
-    setRequests(rawRequests);
-
-    // 2. Load Registered Vendors from STORAGE_KEYS.VENDORS
+  // Helper to load vendors strictly from Vendors & Sites (STORAGE_KEYS.VENDORS)
+  const loadRegisteredVendors = () => {
     const storedVendors = getStorageData(STORAGE_KEYS.VENDORS, []);
     const vList = [];
     storedVendors.forEach((v) => {
       const code = v.code || (Array.isArray(v) ? v[0] : "");
       const name = v.name || (Array.isArray(v) ? v[1] : "");
+      const sites = Array.isArray(v.sites)
+        ? v.sites.map((s) => (typeof s === "string" ? s : s.name)).filter(Boolean)
+        : [];
       if (name && !vList.some((item) => item.name === name)) {
-        vList.push({ name, code: code || "" });
+        vList.push({ name, code: code || "", sites });
       }
     });
+    return vList;
+  };
+
+  useEffect(() => {
+    // 1. Load Requests
+    const rawRequests = getStorageData(STORAGE_KEYS.NEEDED, []);
+    setRequests(rawRequests);
+
+    // 2. Load Registered Vendors from STORAGE_KEYS.VENDORS (Vendors & Sites Page)
+    const vList = loadRegisteredVendors();
     setVendorsList(vList);
 
     // 3. Load Materials Catalog & Live Inventory
@@ -86,7 +97,12 @@ export default function VendorRequestsPage() {
 
     // Preselect first vendor if available
     if (vList.length > 0) {
-      setNewReq((prev) => ({ ...prev, vendor: vList[0].name }));
+      const firstV = vList[0];
+      setNewReq((prev) => ({
+        ...prev,
+        vendor: firstV.name,
+        siteName: firstV.sites?.[0] || prev.siteName,
+      }));
     }
     if (catalog.length > 0) {
       setNewReq((prev) => ({
@@ -112,15 +128,21 @@ export default function VendorRequestsPage() {
   };
 
   const handleOpenModal = () => {
-    const defaultVendor = vendorsList[0]?.name || "Apex Pipeline Infra";
+    // Freshly read vendors directly from Vendors & Sites storage
+    const vList = loadRegisteredVendors();
+    setVendorsList(vList);
+
+    const defaultVendorObj = vList.length > 0 ? vList[0] : null;
+    const defaultVendor = defaultVendorObj?.name || "";
+    const defaultSite = defaultVendorObj?.sites?.[0] || DEFAULT_PROJECT_SITES[0];
     const defaultMat = materialCatalog[0] || { name: "GI Pipe 1/2\"", unit: "Meter" };
 
     setNewReq({
       vendor: defaultVendor,
-      siteName: "Jaipur Project Site",
-      materialName: defaultMat.name,
+      siteName: defaultSite,
+      materialName: defaultMat?.name || "",
       quantityNeeded: 25,
-      unit: inferUnit(defaultMat.name),
+      unit: inferUnit(defaultMat?.name || "GI Pipe"),
       priority: "Normal",
       requiredByDate: new Date().toISOString().split("T")[0],
       remarks: "",
@@ -130,15 +152,26 @@ export default function VendorRequestsPage() {
 
   const handleCreateRequest = (e) => {
     e.preventDefault();
-    if (!newReq.materialName || !newReq.vendor) return;
+    if (!newReq.materialName) {
+      alert("Please select a material.");
+      return;
+    }
+    if (!newReq.vendor) {
+      alert("Please select a vendor registered in Vendors & Sites.");
+      return;
+    }
 
     const vendorMatch = vendorsList.find((v) => v.name === newReq.vendor);
+    if (!vendorMatch) {
+      alert("Selected vendor does not exist in Vendors & Sites.");
+      return;
+    }
 
     const newItem = {
       id: `REQ-${Date.now().toString().slice(-4)}`,
-      vendor: newReq.vendor,
-      vendorCode: vendorMatch ? vendorMatch.code : "",
-      partyName: newReq.vendor,
+      vendor: vendorMatch.name,
+      vendorCode: vendorMatch.code || "",
+      partyName: vendorMatch.name,
       siteName: newReq.siteName || "Central Warehouse",
       materialName: newReq.materialName,
       quantityNeeded: Math.max(1, Number(newReq.quantityNeeded) || 1),
@@ -153,7 +186,7 @@ export default function VendorRequestsPage() {
     const updated = [newItem, ...requests];
     saveRequestsList(updated);
     setIsNewModalOpen(false);
-    setActionNotice(`✓ Vendor request [${newItem.id}] created for ${newReq.vendor} successfully!`);
+    setActionNotice(`✓ Vendor request [${newItem.id}] created for ${vendorMatch.name} successfully!`);
   };
 
   const handleUpdateStatus = (reqItem, newStatus) => {
@@ -309,16 +342,12 @@ export default function VendorRequestsPage() {
     );
   };
 
-  // Dynamic Vendor Filter Options
+  // Dynamic Vendor Filter Options (Comes strictly from registered vendors in Vendors & Sites)
   const vendorOptions = useMemo(() => {
     const set = new Set();
     vendorsList.forEach((v) => set.add(v.name));
-    requests.forEach((r) => {
-      const p = r.vendor || r.partyName;
-      if (p) set.add(p);
-    });
     return ["All", ...Array.from(set)];
-  }, [vendorsList, requests]);
+  }, [vendorsList]);
 
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
@@ -409,34 +438,34 @@ export default function VendorRequestsPage() {
 
       {/* Filter & Search Bar */}
       <section className="card tableCard">
-        <div className="tableControls" style={{ flexDirection: "column", alignItems: "stretch", gap: "10px" }}>
-          <div style={{ display: "flex", gap: "12px", alignItems: "center", width: "100%", flexWrap: "wrap" }}>
-            <div className="invSearchBox" style={{ flex: "1 1 300px" }}>
-              <span>🔍</span>
+        <div className="reqControlsContainer">
+          <div className="reqTopControlsRow">
+            <div className="reqSearchBox">
+              <span className="reqSearchIcon">🔍</span>
               <input
                 type="text"
+                className="reqSearchInput"
                 placeholder="Search vendor, site, material or REQ#..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
               {search && (
-                <button type="button" className="clearBtn" onClick={() => setSearch("")}>
+                <button type="button" className="reqClearBtn" onClick={() => setSearch("")}>
                   ×
                 </button>
               )}
             </div>
 
-            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-              <span style={{ fontSize: "13px", color: "var(--muted)", fontWeight: 600 }}>
+            <div className="reqVendorFilterWrap">
+              <span className="reqVendorLabel">
                 Vendor:
               </span>
               <select
-                className="textInput"
-                style={{ height: "38px", padding: "0 10px", width: "auto", minWidth: "180px" }}
+                className="reqVendorSelect"
                 value={selectedVendorFilter}
                 onChange={(e) => setSelectedVendorFilter(e.target.value)}
               >
-                <option value="All">All Vendors ({vendorOptions.length - 1})</option>
+                <option value="All">All Vendors</option>
                 {vendorOptions.filter((v) => v !== "All").map((v) => (
                   <option key={v} value={v}>
                     {v}
@@ -447,41 +476,27 @@ export default function VendorRequestsPage() {
           </div>
 
           {/* Quick Filter Tabs */}
-          <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "4px" }}>
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                className={`actionBtn ${activeTab === tab ? "view" : ""}`}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: "var(--radius-md)",
-                  fontWeight: activeTab === tab ? 700 : 500,
-                  background: activeTab === tab ? "var(--primary-forest)" : "transparent",
-                  color: activeTab === tab ? "#ffffff" : "var(--text-secondary)",
-                  borderColor: activeTab === tab ? "var(--forest-deep)" : "var(--border-default)",
-                }}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
+          <div className="reqTabsScrollContainer">
+            <div className="reqTabsRow">
+              {STATUS_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={`reqTabBtn ${activeTab === tab ? "active" : ""}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* 1. Mobile-First Cards (Visible on Mobile) */}
         <div className="mobileCardList">
           {filteredRequests.length === 0 ? (
-            <div className="emptyTable">
-              <p>No vendor material requests found.</p>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ marginTop: "8px" }}
-                onClick={handleOpenModal}
-              >
-                + Create Vendor Request
-              </button>
+            <div className="emptyTable reqEmptyState">
+              <p className="reqEmptyStateText">No vendor requests found.</p>
             </div>
           ) : (
             filteredRequests.map((req, idx) => {
@@ -602,16 +617,8 @@ export default function VendorRequestsPage() {
             <tbody>
               {filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="emptyTable">
-                    <p>No vendor requests found.</p>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      style={{ marginTop: "8px" }}
-                      onClick={handleOpenModal}
-                    >
-                      + Create Vendor Request
-                    </button>
+                  <td colSpan={10} className="emptyTable reqEmptyState">
+                    <p className="reqEmptyStateText">No vendor requests found.</p>
                   </td>
                 </tr>
               ) : (
@@ -967,31 +974,26 @@ export default function VendorRequestsPage() {
             <form onSubmit={handleCreateRequest}>
               <div className="modalBody">
                 <div className="formGrid" style={{ gridTemplateColumns: "1fr" }}>
-                  {/* Vendor Selection */}
+                  {/* Vendor Selection (Strictly from Vendors & Sites) */}
                   <label>
                     Vendor Person *
-                    {vendorsList.length > 0 ? (
-                      <select
-                        required
-                        value={newReq.vendor}
-                        onChange={(e) => setNewReq({ ...newReq, vendor: e.target.value })}
-                        style={{ width: "100%", height: "40px" }}
-                      >
-                        {vendorsList.map((v) => (
-                          <option key={v.name} value={v.name}>
-                            {v.name} {v.code ? `(${v.code})` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Apex Pipeline Infra"
-                        value={newReq.vendor}
-                        onChange={(e) => setNewReq({ ...newReq, vendor: e.target.value })}
-                      />
-                    )}
+                    <select
+                      value={newReq.vendor}
+                      onChange={(e) => {
+                        const vName = e.target.value;
+                        const selectedV = vendorsList.find((v) => v.name === vName);
+                        const firstSite = selectedV?.sites?.[0] || DEFAULT_PROJECT_SITES[0];
+                        setNewReq({ ...newReq, vendor: vName, siteName: firstSite });
+                      }}
+                      style={{ width: "100%", height: "40px" }}
+                    >
+                      <option value="">All Vendors</option>
+                      {vendorsList.map((v) => (
+                        <option key={v.name} value={v.name}>
+                          {v.name} {v.code ? `(${v.code})` : ""}
+                        </option>
+                      ))}
+                    </select>
                   </label>
 
                   {/* Destination Site Selection */}
@@ -1002,11 +1004,18 @@ export default function VendorRequestsPage() {
                       onChange={(e) => setNewReq({ ...newReq, siteName: e.target.value })}
                       style={{ width: "100%", height: "40px" }}
                     >
-                      {DEFAULT_PROJECT_SITES.map((site) => (
-                        <option key={site} value={site}>
-                          📍 {site}
-                        </option>
-                      ))}
+                      {(() => {
+                        const currentVendorMatch = vendorsList.find((v) => v.name === newReq.vendor);
+                        const siteOptions =
+                          currentVendorMatch?.sites && currentVendorMatch.sites.length > 0
+                            ? currentVendorMatch.sites
+                            : DEFAULT_PROJECT_SITES;
+                        return siteOptions.map((site) => (
+                          <option key={site} value={site}>
+                            📍 {site}
+                          </option>
+                        ));
+                      })()}
                     </select>
                   </label>
 
@@ -1120,7 +1129,11 @@ export default function VendorRequestsPage() {
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={vendorsList.length === 0 || !newReq.vendor}
+                >
                   Submit Vendor Request
                 </button>
               </div>
@@ -1479,11 +1492,11 @@ export default function VendorRequestsPage() {
                         {resultingRemaining > 0 ? (
                           <>
                             ⚠️ <strong>Partial Issue:</strong> {enteredQty} {unit} will be issued now. A shortage of{" "}
-                            <strong>{resultingRemaining} {unit}</strong> will remain pending (Status will become <em>"Partially Issued"</em>).
+                            <strong>{resultingRemaining} {unit}</strong> will remain pending (Status will become <em>&quot;Partially Issued&quot;</em>).
                           </>
                         ) : (
                           <>
-                            ✓ <strong>Full Issue:</strong> All remaining {remainingNeeded} {unit} will be fulfilled. Status will become <em>"Issued"</em>.
+                            ✓ <strong>Full Issue:</strong> All remaining {remainingNeeded} {unit} will be fulfilled. Status will become <em>&quot;Issued&quot;</em>.
                           </>
                         )}
                       </div>

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import Shell from "@/components/Shell";
 import { Title } from "@/components/ui/Title";
 import { Badge } from "@/components/ui/Badge";
-import DetailDrawer from "@/components/ui/DetailDrawer";
 import { exportToExcel } from "@/lib/exportToExcel";
 import {
   getStorageData,
@@ -12,6 +12,7 @@ import {
   STORAGE_KEYS,
 } from "@/lib/dataService";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
+import DetailDrawer from "@/components/ui/DetailDrawer";
 import "@/components/ui/ui.css";
 import "./vendors.css";
 
@@ -224,12 +225,11 @@ export default function VendorsPage() {
       ];
     });
 
-    exportToExcel(
-      ["Vendor Code", "Vendor Name (Person)", "Mobile Phone", "Email", "Role / Scope", "Project Sites", "Status"],
-      dataRows,
-      "PDV_Vendors_Master.xlsx",
-      "Vendors Registry"
-    );
+    exportToExcel({
+      filename: "PDV_Vendors_Master",
+      headers: ["Vendor Code", "Vendor Name (Person)", "Mobile Phone", "Email", "Role / Scope", "Project Sites", "Status"],
+      rows: dataRows,
+    });
   };
 
   return (

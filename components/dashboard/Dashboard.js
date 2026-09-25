@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Shell from "@/components/Shell";
-import { Badge } from "@/components/ui/Badge";
 import { getDashboardMetrics, calculateLiveInventory } from "@/lib/dataService";
 import "@/components/ui/ui.css";
 import "./dashboard.css";

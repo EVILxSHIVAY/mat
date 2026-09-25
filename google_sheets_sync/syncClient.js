@@ -1,6 +1,6 @@
 "use client";
 
-import { getDatabaseSnapshot } from "@/lib/dataService";
+import { getDatabaseSnapshot } from "@/lib/dataService.js";
 
 const STORAGE_WEBHOOK_KEY = "pdv_gsheet_webhook_url";
 const STORAGE_SHEET_URL_KEY = "pdv_gsheet_spreadsheet_url";

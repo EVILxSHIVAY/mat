@@ -63,13 +63,40 @@
 
 .kpiBox {
   background: var(--bg-surface-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-md, 8px);
   padding: 8px 14px;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 140px;
+  transition: all 0.15s ease;
+}
+
+.kpiBox.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.kpiBox.clickable:hover {
+  border-color: var(--primary-forest, #15803d);
+  background: var(--surface-subtle, #f8fafc);
+  transform: translateY(-1px);
+}
+
+.kpiBox.clickable.active {
+  border-color: var(--primary-forest, #15803d) !important;
+  background: #ecfdf5 !important;
+  box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.2);
+}
+
+.kpiBox.clickable.active .kpiLabel {
+  color: #065f46 !important;
+  font-weight: 700;
+}
+
+.kpiBox.clickable.active .kpiVal {
+  color: #047857 !important;
 }
 
 .kpiBox.success {
@@ -196,23 +223,23 @@
   }
 
   .kpiGroup {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    width: 100%;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
   }
 
   .kpiBox {
-    min-width: 0;
-    padding: 6px 8px;
+    min-width: 0 !important;
+    padding: 10px 12px !important;
   }
 
   .kpiLabel {
-    font-size: 9px;
+    font-size: 10px !important;
   }
 
   .kpiVal {
-    font-size: 12.5px;
+    font-size: 14px !important;
   }
 
   .ledgerTabs {

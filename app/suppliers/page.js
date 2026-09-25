@@ -14,6 +14,17 @@ import {
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import "@/components/ui/ui.css";
 
+// Normalize supplier row (array or object) to a consistent shape
+function parseSupplier(s) {
+  if (Array.isArray(s)) {
+    return { code: s[0], name: s[1], contact: s[2], mobile: s[3], email: s[4], gst: s[5], status: s[6] || "Active" };
+  }
+  return {
+    code: s.code || "", name: s.name || "", contact: s.contactPerson || s.contact || "",
+    mobile: s.mobile || "", email: s.email || "", gst: s.gst || "", status: s.status || "Active",
+  };
+}
+
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState("");
@@ -60,8 +71,8 @@ export default function SuppliersPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suppliers: list }),
-      }).catch(() => {});
-    } catch (e) {}
+      }).catch(() => { });
+    } catch (e) { }
   };
 
   const handleOpenAdd = () => {
@@ -82,15 +93,7 @@ export default function SuppliersPage() {
   const handleOpenEdit = (sup, idx) => {
     setModalMode("edit");
     setEditIndex(idx);
-    setFormData({
-      code: Array.isArray(sup) ? sup[0] : sup.code || "",
-      name: Array.isArray(sup) ? sup[1] : sup.name || "",
-      contact: Array.isArray(sup) ? sup[2] : sup.contactPerson || sup.contact || "",
-      mobile: Array.isArray(sup) ? sup[3] : sup.mobile || "",
-      email: Array.isArray(sup) ? sup[4] : sup.email || "",
-      gst: Array.isArray(sup) ? sup[5] : sup.gst || "",
-      status: Array.isArray(sup) ? sup[6] : sup.status || "Active",
-    });
+    setFormData(parseSupplier(sup));
     setIsModalOpen(true);
   };
 
@@ -123,39 +126,29 @@ export default function SuppliersPage() {
   };
 
   const handleDelete = (index) => {
-    const target = suppliers[index];
-    const targetName = Array.isArray(target) ? target[1] : target.name;
-    if (confirm(`Are you sure you want to delete supplier "${targetName}"?`)) {
+    const { name } = parseSupplier(suppliers[index]);
+    if (confirm(`Are you sure you want to delete supplier "${name}"?`)) {
       saveList(suppliers.filter((_, i) => i !== index));
     }
   };
 
   const filteredSuppliers = useMemo(() => {
+    if (!search) return suppliers;
+    const q = search.toLowerCase();
     return suppliers.filter((s) => {
-      const name = Array.isArray(s) ? s[1] : s.name;
-      const code = Array.isArray(s) ? s[0] : s.code;
-      const contact = Array.isArray(s) ? s[2] : s.contactPerson || s.contact;
-      const mobile = Array.isArray(s) ? s[3] : s.mobile;
-      const gst = Array.isArray(s) ? s[5] : s.gst;
-
-      return (
-        !search ||
-        String(name || "").toLowerCase().includes(search.toLowerCase()) ||
-        String(code || "").toLowerCase().includes(search.toLowerCase()) ||
-        String(contact || "").toLowerCase().includes(search.toLowerCase()) ||
-        String(mobile || "").toLowerCase().includes(search.toLowerCase()) ||
-        String(gst || "").toLowerCase().includes(search.toLowerCase())
+      const { name, code, contact, mobile, gst } = parseSupplier(s);
+      return [name, code, contact, mobile, gst].some(
+        (v) => String(v || "").toLowerCase().includes(q)
       );
     });
   }, [suppliers, search]);
 
   const handleExport = () => {
     const headers = ["Supplier Code", "Supplier / Company Name", "Contact Person", "Mobile", "Email", "GSTIN", "Status"];
-    const rows = filteredSuppliers.map((s) =>
-      Array.isArray(s)
-        ? s
-        : [s.code, s.name, s.contactPerson || s.contact, s.mobile, s.email, s.gst, s.status]
-    );
+    const rows = filteredSuppliers.map((s) => {
+      const p = parseSupplier(s);
+      return [p.code, p.name, p.contact, p.mobile, p.email, p.gst, p.status];
+    });
     exportToExcel({ filename: "Suppliers_Directory", headers, rows });
   };
 
@@ -226,12 +219,7 @@ export default function SuppliersPage() {
             </div>
           ) : (
             filteredSuppliers.map((s, idx) => {
-              const code = Array.isArray(s) ? s[0] : s.code;
-              const name = Array.isArray(s) ? s[1] : s.name;
-              const contact = Array.isArray(s) ? s[2] : s.contactPerson || s.contact;
-              const mobile = Array.isArray(s) ? s[3] : s.mobile;
-              const gst = Array.isArray(s) ? s[5] : s.gst;
-              const stat = Array.isArray(s) ? s[6] : s.status || "Active";
+              const { code, name, contact, mobile, gst, status: stat } = parseSupplier(s);
 
               return (
                 <div key={idx} className="mobileDataCard">
@@ -315,13 +303,7 @@ export default function SuppliersPage() {
                 </tr>
               ) : (
                 filteredSuppliers.map((s, idx) => {
-                  const code = Array.isArray(s) ? s[0] : s.code;
-                  const name = Array.isArray(s) ? s[1] : s.name;
-                  const contact = Array.isArray(s) ? s[2] : s.contactPerson || s.contact;
-                  const mobile = Array.isArray(s) ? s[3] : s.mobile;
-                  const email = Array.isArray(s) ? s[4] : s.email;
-                  const gst = Array.isArray(s) ? s[5] : s.gst;
-                  const stat = Array.isArray(s) ? s[6] : s.status || "Active";
+                  const { code, name, contact, mobile, email, gst, status: stat } = parseSupplier(s);
 
                   return (
                     <tr key={idx}>

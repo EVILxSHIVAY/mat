@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/Badge";
 import { exportToExcel } from "@/lib/exportToExcel";
 import {
   syncMasterGoogleSheet,
-  initializeSheetStructure,
   getMasterSheetUrl,
   getWebhookUrl,
   saveSheetConfig,

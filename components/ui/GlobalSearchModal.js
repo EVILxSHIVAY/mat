@@ -92,7 +92,7 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
         <div className="searchResultsList">
           {results.length === 0 ? (
             <div className="searchEmpty">
-              <p>No matches found for "{query}"</p>
+              <p>No matches found for &quot;{query}&quot;</p>
               <small>Try searching for a product name, voucher code, vendor or site.</small>
             </div>
           ) : (

@@ -15,18 +15,14 @@ import "./parties.css";
 export default function PartiesAndSitesPage() {
   const [issues, setIssues] = useState([]);
   const [consumptions, setConsumptions] = useState([]);
-  const [needed, setNeeded] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     setIssues(getStorageData(STORAGE_KEYS.ISSUES, []));
     setConsumptions(getStorageData(STORAGE_KEYS.CONSUMPTIONS, []));
-    setNeeded(getStorageData(STORAGE_KEYS.NEEDED, []));
     setPayments(getStorageData(STORAGE_KEYS.PAYMENTS, []));
-    setSuppliers(getStorageData(STORAGE_KEYS.SUPPLIERS, []));
     setVendors(getStorageData(STORAGE_KEYS.VENDORS, []));
   }, []);
 
